@@ -135,6 +135,46 @@
   #log.show { display: block; }
   #log .err { color: #ef4444; }
   #log .warn { color: #f59e0b; }
+
+  /* 튜닝 패널 */
+  #tune-panel {
+    position: fixed;
+    left: 12px; right: 12px; bottom: 80px;
+    background: rgba(0,0,0,0.92);
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    padding: 12px;
+    z-index: 1500;
+    display: none;
+  }
+  #tune-panel.show { display: block; }
+  .tune-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: #ccc;
+  }
+  .tune-row:last-child { margin-bottom: 0; }
+  .tune-row label {
+    flex: 0 0 120px;
+    display: flex;
+    justify-content: space-between;
+    gap: 4px;
+  }
+  .tune-row label span {
+    color: #4ade80;
+    font-variant-numeric: tabular-nums;
+  }
+  .tune-row input[type=range] {
+    flex: 1;
+    accent-color: #2563eb;
+  }
+  .tune-row input[type=checkbox] {
+    margin-right: 6px;
+    accent-color: #2563eb;
+  }
 </style>
 </head>
 <body>
@@ -163,7 +203,34 @@
     <div id="status">대기 중</div>
     <button id="toggle-preview" class="secondary">카메라</button>
     <button id="toggle-log" class="secondary">로그</button>
+    <button id="toggle-tune" class="secondary">튜닝</button>
     <button id="reset-btn" class="secondary">리셋</button>
+  </div>
+</div>
+
+<div id="tune-panel">
+  <div class="tune-row">
+    <label>Y 민감도 <span id="v-eyeY">2.5</span></label>
+    <input type="range" id="s-eyeY" min="0.5" max="5" step="0.1" value="2.5">
+  </div>
+  <div class="tune-row">
+    <label>머리 끄덕임 <span id="v-pitch">2.0</span></label>
+    <input type="range" id="s-pitch" min="0" max="5" step="0.1" value="2.0">
+  </div>
+  <div class="tune-row">
+    <label>Y 중심 보정 <span id="v-yoff">-0.15</span></label>
+    <input type="range" id="s-yoff" min="-0.4" max="0.4" step="0.01" value="-0.15">
+  </div>
+  <div class="tune-row">
+    <label>X 민감도 <span id="v-eyeX">1.0</span></label>
+    <input type="range" id="s-eyeX" min="0.5" max="3" step="0.1" value="1.0">
+  </div>
+  <div class="tune-row">
+    <label>머리 좌우 <span id="v-yaw">0.8</span></label>
+    <input type="range" id="s-yaw" min="0" max="3" step="0.1" value="0.8">
+  </div>
+  <div class="tune-row">
+    <label><input type="checkbox" id="c-flipx" checked> 좌우 반전 (거울)</label>
   </div>
 </div>
 
@@ -246,6 +313,32 @@ const quads = {
 
 toggleLogBtn.addEventListener('click', () => logEl.classList.toggle('show'));
 togglePreviewBtn.addEventListener('click', () => preview.classList.toggle('on'));
+
+// 튜닝 패널
+const tunePanel = document.getElementById('tune-panel');
+const toggleTuneBtn = document.getElementById('toggle-tune');
+toggleTuneBtn.addEventListener('click', () => tunePanel.classList.toggle('show'));
+
+function bindSlider(id, paramKey, valueId) {
+  const slider = document.getElementById(id);
+  const display = document.getElementById(valueId);
+  slider.addEventListener('input', () => {
+    const v = parseFloat(slider.value);
+    GAZE_PARAMS[paramKey] = v;
+    display.textContent = v.toFixed(2);
+  });
+}
+// GAZE_PARAMS는 아래에 정의되지만, 슬라이더는 시작 후 동작하므로 OK
+setTimeout(() => {
+  bindSlider('s-eyeY', 'eyeYGain', 'v-eyeY');
+  bindSlider('s-pitch', 'headPitchGain', 'v-pitch');
+  bindSlider('s-yoff', 'yCenterOffset', 'v-yoff');
+  bindSlider('s-eyeX', 'eyeXGain', 'v-eyeX');
+  bindSlider('s-yaw', 'headYawGain', 'v-yaw');
+  document.getElementById('c-flipx').addEventListener('change', (e) => {
+    GAZE_PARAMS.flipX = e.target.checked;
+  });
+}, 0);
 
 let gazeTimes = { TL: 0, TR: 0, BL: 0, BR: 0 };
 resetBtn.addEventListener('click', () => {
@@ -377,6 +470,16 @@ async function startCamera() {
   }
 }
 
+// 튜닝 파라미터 — 폰/사용자에 맞게 조정 가능
+const GAZE_PARAMS = {
+  flipX: true,           // 거울 모드 보정 (좌우 반전)
+  eyeXGain: 1.0,         // 눈동자 X 민감도
+  eyeYGain: 2.5,         // 눈동자 Y 민감도 (위/아래는 범위가 좁아서 크게)
+  headYawGain: 0.8,      // 머리 좌우 회전 가중치
+  headPitchGain: 2.0,    // 머리 끄덕임 가중치 (Y도 크게)
+  yCenterOffset: -0.15,  // 폰을 살짝 아래로 들어서 정면이 0.5보다 아래로 잡히는 것 보정
+};
+
 function estimateGaze(landmarks, matrix) {
   const lIris = landmarks[468];
   const rIris = landmarks[473];
@@ -389,6 +492,7 @@ function estimateGaze(landmarks, matrix) {
   const rEyeTop = landmarks[386];
   const rEyeBottom = landmarks[374];
 
+  // 눈동자 상대 위치 (0~1)
   const lRelX = (lIris.x - lEyeOuter.x) / (lEyeInner.x - lEyeOuter.x);
   const rRelX = (rIris.x - rEyeInner.x) / (rEyeOuter.x - rEyeInner.x);
   const eyeX = (lRelX + rRelX) / 2;
@@ -397,6 +501,11 @@ function estimateGaze(landmarks, matrix) {
   const rRelY = (rIris.y - rEyeTop.y) / (rEyeBottom.y - rEyeTop.y);
   const eyeY = (lRelY + rRelY) / 2;
 
+  // 중심(0.5) 기준으로 편차 계산 후 게인 적용
+  const eyeDx = (eyeX - 0.5) * GAZE_PARAMS.eyeXGain;
+  const eyeDy = (eyeY - 0.5) * GAZE_PARAMS.eyeYGain;
+
+  // 머리 회전
   let headYaw = 0, headPitch = 0;
   if (matrix && matrix.data) {
     const m = matrix.data;
@@ -404,8 +513,14 @@ function estimateGaze(landmarks, matrix) {
     headPitch = Math.atan2(-m[9], Math.sqrt(m[1]*m[1] + m[5]*m[5]));
   }
 
-  let screenX = eyeX + headYaw * 0.7;
-  let screenY = eyeY + headPitch * 0.7;
+  // 합성: 중심(0.5) + 눈동자 편차 + 머리 회전
+  let screenX = 0.5 + eyeDx + headYaw * GAZE_PARAMS.headYawGain;
+  let screenY = 0.5 + eyeDy + headPitch * GAZE_PARAMS.headPitchGain + GAZE_PARAMS.yCenterOffset;
+
+  // 좌우 반전 (거울 모드 보정)
+  if (GAZE_PARAMS.flipX) screenX = 1 - screenX;
+
+  // 클램프
   screenX = Math.max(0, Math.min(1, screenX));
   screenY = Math.max(0, Math.min(1, screenY));
   return { x: screenX, y: screenY };
