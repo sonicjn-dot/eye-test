@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>손 추적 데모</title>
+<title>객체 감지</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
@@ -13,163 +13,70 @@
   }
   #app { position: fixed; inset: 0; display: flex; flex-direction: column; }
 
-  /* 탭 바 */
-  #tabs {
-    display: flex;
-    background: #0a0a0a;
-    border-bottom: 1px solid #2a2a2a;
-    flex-shrink: 0;
-  }
-  .tab {
-    flex: 1;
-    padding: 14px 8px;
-    text-align: center;
-    font-size: 13px;
-    font-weight: 500;
-    color: #888;
-    cursor: pointer;
-    border-bottom: 2px solid transparent;
-    transition: all 0.15s;
-  }
-  .tab.active {
-    color: #fff;
-    border-bottom-color: #2563eb;
-    background: #1a1a1a;
-  }
-
-  /* 메인 영역 */
+  /* 카메라 풀스크린 */
   #stage {
     flex: 1;
     position: relative;
     overflow: hidden;
+    background: #000;
   }
-  .mode {
-    position: absolute;
-    inset: 0;
-    display: none;
-  }
-  .mode.active { display: block; }
-
-  /* === 포인터 모드 === */
-  #pointer-mode {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: 1fr 1fr;
-    gap: 2px;
-    background: #2a2a2a;
-  }
-  .quad {
-    background: #1a1a1a;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 56px; font-weight: 700; color: #444;
-    transition: background 0.15s, color 0.15s;
-    position: relative;
-  }
-  .quad.active { background: #2563eb; color: #fff; }
-  .quad-label {
-    position: absolute; top: 12px; left: 12px;
-    font-size: 11px; font-weight: 500; color: #666; letter-spacing: 1px;
-  }
-  .quad.active .quad-label { color: rgba(255,255,255,0.7); }
-  #finger-cursor {
-    position: absolute;
-    width: 32px; height: 32px;
-    background: radial-gradient(circle, #4ade80 30%, rgba(74,222,128,0.4) 70%, transparent);
-    border-radius: 50%;
-    pointer-events: none;
-    transform: translate(-50%,-50%);
-    z-index: 30;
-    display: none;
-    transition: top 0.05s linear, left 0.05s linear;
-  }
-  #finger-cursor.on { display: block; }
-  #finger-cursor.pinch {
-    background: radial-gradient(circle, #ef4444 30%, rgba(239,68,68,0.4) 70%, transparent);
-    transform: translate(-50%,-50%) scale(1.4);
-  }
-
-  /* === 제스처 모드 === */
-  #gesture-mode {
-    background: #0a0a0a;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-  }
-  #gesture-display {
-    text-align: center;
-  }
-  #gesture-emoji {
-    font-size: 200px;
-    line-height: 1;
-    margin-bottom: 24px;
-    filter: grayscale(0.3);
-    transition: transform 0.2s;
-  }
-  #gesture-emoji.active { transform: scale(1.1); filter: grayscale(0); }
-  #gesture-name {
-    font-size: 32px;
-    font-weight: 700;
-    margin-bottom: 8px;
-    color: #fff;
-  }
-  #gesture-name.none { color: #444; }
-  #gesture-confidence {
-    font-size: 14px;
-    color: #888;
-    font-variant-numeric: tabular-nums;
-  }
-  #gesture-history {
-    margin-top: 32px;
-    display: flex;
-    gap: 12px;
-    font-size: 36px;
-    opacity: 0.4;
-  }
-  .hist-item {
-    width: 50px; height: 50px;
-    display: flex; align-items: center; justify-content: center;
-    background: #1a1a1a;
-    border-radius: 8px;
-  }
-
-  /* === 드로잉 모드 === */
-  #drawing-mode {
-    background: #0a0a0a;
-  }
-  #draw-canvas {
+  #video {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1); /* 거울 모드 */
   }
-  #draw-info {
+  #overlay {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    transform: scaleX(-1); /* 박스도 같이 반전 */
+  }
+
+  /* 상단 통계 */
+  #stats {
     position: absolute;
     top: 12px; left: 12px;
     background: rgba(0,0,0,0.7);
-    padding: 8px 12px;
-    border-radius: 8px;
-    font-size: 12px;
-    color: #ccc;
-    z-index: 20;
+    backdrop-filter: blur(10px);
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    z-index: 10;
     line-height: 1.5;
   }
-  #draw-info strong { color: #4ade80; }
-  #color-picker {
+  #stats .count { font-weight: 700; color: #4ade80; font-size: 18px; }
+  #stats .fps { color: #888; font-size: 11px; }
+
+  /* 발견된 객체 리스트 */
+  #found-list {
     position: absolute;
     top: 12px; right: 12px;
+    max-width: 50%;
+    z-index: 10;
     display: flex;
-    gap: 6px;
-    z-index: 20;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-end;
   }
-  .color-btn {
-    width: 28px; height: 28px;
-    border-radius: 50%;
-    cursor: pointer;
-    border: 2px solid transparent;
+  .found-tag {
+    background: rgba(74, 222, 128, 0.9);
+    color: #000;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    backdrop-filter: blur(8px);
+    animation: pop 0.2s ease-out;
   }
-  .color-btn.active { border-color: #fff; }
+  @keyframes pop {
+    from { transform: scale(0.8); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
 
   /* 패널 */
   #panel {
@@ -181,9 +88,7 @@
     align-items: center;
     flex-shrink: 0;
   }
-  #status {
-    flex: 1; font-size: 12px; color: #888; line-height: 1.4;
-  }
+  #status { flex: 1; font-size: 12px; color: #888; line-height: 1.4; }
   #status.ok { color: #4ade80; }
   #status.err { color: #ef4444; }
   button {
@@ -195,22 +100,47 @@
   button:disabled { background: #374151; opacity: 0.6; }
   button.secondary { background: #374151; }
 
-  /* 카메라 프리뷰 */
-  #preview {
-    position: fixed;
-    bottom: 70px; right: 12px;
-    width: 100px; height: 140px;
-    border-radius: 8px;
-    overflow: hidden;
-    border: 1px solid #2a2a2a;
-    background: #000;
-    z-index: 100;
+  /* 필터 패널 */
+  #filter-panel {
+    position: absolute;
+    bottom: 12px; left: 12px; right: 12px;
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(10px);
+    border-radius: 10px;
+    padding: 12px;
+    z-index: 15;
     display: none;
+    max-height: 300px;
+    overflow-y: auto;
   }
-  #preview.on { display: block; }
-  #video, #overlay {
-    position: absolute; inset: 0; width: 100%; height: 100%;
-    transform: scaleX(-1);
+  #filter-panel.on { display: block; }
+  #filter-panel h3 {
+    font-size: 13px; color: #888; margin-bottom: 8px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .filter-actions {
+    display: flex; gap: 6px;
+  }
+  .filter-actions button { padding: 4px 8px; font-size: 11px; }
+  .filter-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+  }
+  .filter-item {
+    padding: 6px 8px;
+    background: #1a1a1a;
+    border-radius: 6px;
+    font-size: 11px;
+    color: #888;
+    cursor: pointer;
+    text-align: center;
+    border: 1px solid transparent;
+  }
+  .filter-item.on {
+    background: #1e3a8a;
+    color: #fff;
+    border-color: #2563eb;
   }
 
   /* 인트로 */
@@ -254,71 +184,46 @@
 <body>
 
 <div id="app">
-  <div id="tabs">
-    <div class="tab active" data-mode="pointer">👆 포인터</div>
-    <div class="tab" data-mode="gesture">✋ 제스처</div>
-    <div class="tab" data-mode="drawing">🎨 드로잉</div>
-  </div>
-
   <div id="stage">
-    <!-- 포인터 모드 -->
-    <div id="pointer-mode" class="mode active">
-      <div class="quad" data-q="TL"><span class="quad-label">좌상</span>↖</div>
-      <div class="quad" data-q="TR"><span class="quad-label">우상</span>↗</div>
-      <div class="quad" data-q="BL"><span class="quad-label">좌하</span>↙</div>
-      <div class="quad" data-q="BR"><span class="quad-label">우하</span>↘</div>
-      <div id="finger-cursor"></div>
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="overlay"></canvas>
+
+    <div id="stats">
+      <div><span class="count" id="count">0</span> 개 감지</div>
+      <div class="fps" id="fps">-- fps</div>
     </div>
 
-    <!-- 제스처 모드 -->
-    <div id="gesture-mode" class="mode">
-      <div id="gesture-display">
-        <div id="gesture-emoji">🖐️</div>
-        <div id="gesture-name" class="none">손을 보여주세요</div>
-        <div id="gesture-confidence">대기 중</div>
-      </div>
-      <div id="gesture-history"></div>
-    </div>
+    <div id="found-list"></div>
 
-    <!-- 드로잉 모드 -->
-    <div id="drawing-mode" class="mode">
-      <canvas id="draw-canvas"></canvas>
-      <div id="draw-info">
-        <strong>검지만 펴기</strong>: 그리기<br>
-        <strong>주먹</strong>: 멈춤<br>
-        <strong>보자기</strong>: 전체 지우기
-      </div>
-      <div id="color-picker">
-        <div class="color-btn active" data-color="#4ade80" style="background:#4ade80"></div>
-        <div class="color-btn" data-color="#3b82f6" style="background:#3b82f6"></div>
-        <div class="color-btn" data-color="#ef4444" style="background:#ef4444"></div>
-        <div class="color-btn" data-color="#f59e0b" style="background:#f59e0b"></div>
-        <div class="color-btn" data-color="#ffffff" style="background:#ffffff"></div>
-      </div>
+    <div id="filter-panel">
+      <h3>
+        <span>카테고리 필터</span>
+        <div class="filter-actions">
+          <button id="filter-all" class="secondary">전체</button>
+          <button id="filter-animals" class="secondary">동물만</button>
+          <button id="filter-none" class="secondary">해제</button>
+        </div>
+      </h3>
+      <div class="filter-grid" id="filter-grid"></div>
     </div>
   </div>
 
   <div id="panel">
     <div id="status">대기 중</div>
-    <button id="toggle-preview" class="secondary">카메라</button>
+    <button id="toggle-filter" class="secondary">필터</button>
     <button id="toggle-log" class="secondary">로그</button>
-    <button id="clear-btn" class="secondary">지우기</button>
   </div>
-</div>
-
-<div id="preview">
-  <video id="video" autoplay playsinline muted></video>
-  <canvas id="overlay"></canvas>
 </div>
 
 <div id="intro">
   <div class="intro-card">
-    <h1>✋ 손 추적 데모</h1>
-    <p>한 손을 화면에 보이면<br>3가지 모드로 인식합니다.</p>
+    <h1>📷 객체 감지</h1>
+    <p>카메라에 잡힌 객체를 실시간으로 인식합니다.<br>강아지 포함 80가지를 알아봐요.</p>
     <ul>
-      <li><strong>포인터</strong>: 검지 끝으로 화면 가리키기 (엄지+검지 핀치 = 클릭)</li>
-      <li><strong>제스처</strong>: 주먹/보/가위/엄지척/V/OK 인식</li>
-      <li><strong>드로잉</strong>: 검지로 허공에 그림 그리기</li>
+      <li><strong>동물</strong>: 강아지, 고양이, 새, 말, 양, 소 등</li>
+      <li><strong>사물</strong>: 컵, 휴대폰, 의자, 책 등</li>
+      <li>여러 개 동시 인식 가능</li>
+      <li>박스가 객체를 따라다님</li>
     </ul>
     <button id="start-btn">카메라 시작</button>
   </div>
@@ -347,100 +252,172 @@ window.addEventListener('unhandledrejection', (e) => {
   logEl.classList.add('show');
 });
 
+// ========== 한글 라벨 매핑 (COCO 80) ==========
+const KO_LABELS = {
+  'person': '사람', 'bicycle': '자전거', 'car': '자동차', 'motorcycle': '오토바이',
+  'airplane': '비행기', 'bus': '버스', 'train': '기차', 'truck': '트럭', 'boat': '보트',
+  'traffic light': '신호등', 'fire hydrant': '소화전', 'stop sign': '정지표지', 'parking meter': '주차미터', 'bench': '벤치',
+  'bird': '새', 'cat': '고양이', 'dog': '강아지', 'horse': '말', 'sheep': '양',
+  'cow': '소', 'elephant': '코끼리', 'bear': '곰', 'zebra': '얼룩말', 'giraffe': '기린',
+  'backpack': '배낭', 'umbrella': '우산', 'handbag': '핸드백', 'tie': '넥타이', 'suitcase': '여행가방',
+  'frisbee': '프리스비', 'skis': '스키', 'snowboard': '스노보드', 'sports ball': '공',
+  'kite': '연', 'baseball bat': '야구방망이', 'baseball glove': '야구글러브', 'skateboard': '스케이트보드',
+  'surfboard': '서핑보드', 'tennis racket': '테니스라켓',
+  'bottle': '병', 'wine glass': '와인잔', 'cup': '컵', 'fork': '포크', 'knife': '나이프',
+  'spoon': '숟가락', 'bowl': '그릇',
+  'banana': '바나나', 'apple': '사과', 'sandwich': '샌드위치', 'orange': '오렌지',
+  'broccoli': '브로콜리', 'carrot': '당근', 'hot dog': '핫도그', 'pizza': '피자',
+  'donut': '도넛', 'cake': '케이크',
+  'chair': '의자', 'couch': '소파', 'potted plant': '화분', 'bed': '침대', 'dining table': '식탁',
+  'toilet': '변기', 'tv': 'TV', 'laptop': '노트북', 'mouse': '마우스', 'remote': '리모컨',
+  'keyboard': '키보드', 'cell phone': '휴대폰', 'microwave': '전자레인지', 'oven': '오븐',
+  'toaster': '토스터', 'sink': '싱크대', 'refrigerator': '냉장고',
+  'book': '책', 'clock': '시계', 'vase': '꽃병', 'scissors': '가위', 'teddy bear': '인형',
+  'hair drier': '드라이어', 'toothbrush': '칫솔',
+};
+
+const ANIMAL_CATEGORIES = ['bird', 'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe', 'person'];
+
+function getKoLabel(en) {
+  return KO_LABELS[en] || en;
+}
+
+// 카테고리별 색상
+function colorForCategory(name) {
+  const animals = new Set(ANIMAL_CATEGORIES);
+  if (animals.has(name)) return '#4ade80'; // 동물: 초록
+  if (name === 'person') return '#3b82f6';  // 사람: 파랑
+  // 나머지 사물: 해시 기반 색상
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
+  const hue = Math.abs(hash) % 360;
+  return `hsl(${hue}, 70%, 60%)`;
+}
+
 // ========== DOM ==========
 const startBtn = document.getElementById('start-btn');
-const togglePreviewBtn = document.getElementById('toggle-preview');
+const toggleFilterBtn = document.getElementById('toggle-filter');
 const toggleLogBtn = document.getElementById('toggle-log');
-const clearBtn = document.getElementById('clear-btn');
 const statusEl = document.getElementById('status');
 const intro = document.getElementById('intro');
-const preview = document.getElementById('preview');
 const video = document.getElementById('video');
 const overlay = document.getElementById('overlay');
 const octx = overlay.getContext('2d');
 const stage = document.getElementById('stage');
-const fingerCursor = document.getElementById('finger-cursor');
-const drawCanvas = document.getElementById('draw-canvas');
-const dctx = drawCanvas.getContext('2d');
-const gestureEmoji = document.getElementById('gesture-emoji');
-const gestureName = document.getElementById('gesture-name');
-const gestureConfidence = document.getElementById('gesture-confidence');
-const gestureHistory = document.getElementById('gesture-history');
-
-const tabs = document.querySelectorAll('.tab');
-const modes = document.querySelectorAll('.mode');
-
-const quads = {
-  TL: document.querySelector('[data-q="TL"]'),
-  TR: document.querySelector('[data-q="TR"]'),
-  BL: document.querySelector('[data-q="BL"]'),
-  BR: document.querySelector('[data-q="BR"]'),
-};
+const countEl = document.getElementById('count');
+const fpsEl = document.getElementById('fps');
+const foundList = document.getElementById('found-list');
+const filterPanel = document.getElementById('filter-panel');
+const filterGrid = document.getElementById('filter-grid');
 
 // ========== 상태 ==========
-let handLandmarker = null;
+let objectDetector = null;
 let running = false;
 let lastVideoTime = -1;
-let currentMode = 'pointer';
-let currentQuad = null;
-let drawColor = '#4ade80';
-let lastDrawPoint = null;
-let gestureHistoryArr = [];
-let lastGesture = null;
-let gestureStableFrames = 0;
 
-// 스무딩 (포인터/드로잉용)
-const smoothBuf = { x: [], y: [], size: 4 };
-function smooth(buf, val) {
-  buf.push(val);
-  if (buf.length > smoothBuf.size) buf.shift();
-  return buf.reduce((a, b) => a + b, 0) / buf.length;
+// 필터: 빈 Set이면 전체 표시
+let enabledCategories = new Set();
+let filterMode = 'all'; // 'all' | 'animals' | 'custom'
+
+// FPS 측정
+let frameCount = 0;
+let lastFpsTime = performance.now();
+
+// "발견된 적 있는" 카테고리 추적 (튜토리얼 효과)
+let seenCategories = new Set();
+let recentFoundDisplay = new Map(); // name -> 마지막 표시 시각
+
+// ========== 필터 UI ==========
+function buildFilterUI() {
+  const allLabels = Object.keys(KO_LABELS).sort((a, b) => getKoLabel(a).localeCompare(getKoLabel(b)));
+  filterGrid.innerHTML = '';
+  for (const en of allLabels) {
+    const div = document.createElement('div');
+    div.className = 'filter-item';
+    div.textContent = getKoLabel(en);
+    div.dataset.cat = en;
+    div.addEventListener('click', () => toggleFilterItem(en, div));
+    filterGrid.appendChild(div);
+  }
+  applyFilterUI();
 }
 
-// ========== 캔버스 리사이즈 ==========
-function resizeDrawCanvas() {
-  const rect = drawCanvas.getBoundingClientRect();
-  drawCanvas.width = rect.width;
-  drawCanvas.height = rect.height;
+function toggleFilterItem(cat, el) {
+  if (enabledCategories.has(cat)) {
+    enabledCategories.delete(cat);
+  } else {
+    enabledCategories.add(cat);
+  }
+  filterMode = 'custom';
+  applyFilterUI();
 }
-window.addEventListener('resize', resizeDrawCanvas);
+
+function applyFilterUI() {
+  document.querySelectorAll('.filter-item').forEach(el => {
+    const isOn = enabledCategories.size === 0 || enabledCategories.has(el.dataset.cat);
+    el.classList.toggle('on', isOn);
+  });
+}
+
+document.getElementById('filter-all').addEventListener('click', () => {
+  enabledCategories.clear();
+  filterMode = 'all';
+  applyFilterUI();
+});
+document.getElementById('filter-animals').addEventListener('click', () => {
+  enabledCategories = new Set(ANIMAL_CATEGORIES);
+  filterMode = 'animals';
+  applyFilterUI();
+});
+document.getElementById('filter-none').addEventListener('click', () => {
+  enabledCategories = new Set(['__none__']); // 아무것도 매칭 안 됨
+  filterMode = 'custom';
+  applyFilterUI();
+});
+
+function isCategoryEnabled(cat) {
+  if (enabledCategories.size === 0) return true;
+  return enabledCategories.has(cat);
+}
 
 // ========== MediaPipe 로딩 ==========
 async function loadMediaPipe() {
   log('MediaPipe 모듈 로딩...');
   const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/vision_bundle.mjs');
-  const { FilesetResolver, HandLandmarker } = vision;
+  const { FilesetResolver, ObjectDetector } = vision;
 
   log('WASM fileset 로딩...');
   const filesetResolver = await FilesetResolver.forVisionTasks(
     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/wasm"
   );
 
-  log('Hand 모델 다운로드...');
-  let landmarker;
+  log('Object Detector 모델 다운로드... (~10MB)');
+  let detector;
   try {
-    landmarker = await HandLandmarker.createFromOptions(filesetResolver, {
+    detector = await ObjectDetector.createFromOptions(filesetResolver, {
       baseOptions: {
-        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite",
         delegate: "GPU"
       },
+      scoreThreshold: 0.4,
       runningMode: "VIDEO",
-      numHands: 1,
+      maxResults: 10,
     });
     log('GPU 모드');
   } catch (e) {
     log(`GPU 실패, CPU로: ${e.message}`, 'warn');
-    landmarker = await HandLandmarker.createFromOptions(filesetResolver, {
+    detector = await ObjectDetector.createFromOptions(filesetResolver, {
       baseOptions: {
-        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite",
         delegate: "CPU"
       },
+      scoreThreshold: 0.4,
       runningMode: "VIDEO",
-      numHands: 1,
+      maxResults: 10,
     });
     log('CPU 모드');
   }
-  return landmarker;
+  return detector;
 }
 
 // ========== 시작 ==========
@@ -451,7 +428,7 @@ async function startApp() {
   try {
     log('카메라 권한 요청');
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
       audio: false
     });
     video.srcObject = stream;
@@ -459,252 +436,163 @@ async function startApp() {
       video.addEventListener('loadeddata', res, { once: true });
       setTimeout(() => rej(new Error('비디오 타임아웃')), 10000);
     });
-    overlay.width = video.videoWidth;
-    overlay.height = video.videoHeight;
     log(`비디오: ${video.videoWidth}x${video.videoHeight}`);
 
-    if (!handLandmarker) {
-      handLandmarker = await loadMediaPipe();
+    // 후면 카메라가 안 되면 전면으로 재시도 (PC는 후면 없음)
+    // 위에서 environment로 시도했는데 실패한 경우는 catch에서 처리됨
+
+    resizeOverlay();
+    window.addEventListener('resize', resizeOverlay);
+
+    if (!objectDetector) {
+      objectDetector = await loadMediaPipe();
     }
 
     intro.style.display = 'none';
-    resizeDrawCanvas();
+    buildFilterUI();
     running = true;
-    statusEl.textContent = '추적 중 — 손을 카메라에 보여주세요';
+    statusEl.textContent = '추적 중';
     statusEl.className = 'ok';
     requestAnimationFrame(loop);
   } catch (e) {
-    log(`시작 실패: ${e.message}`, 'err');
-    statusEl.textContent = '실패: ' + e.message;
-    statusEl.className = 'err';
-    startBtn.disabled = false;
-    startBtn.textContent = '다시 시도';
-    logEl.classList.add('show');
+    log(`environment 카메라 실패: ${e.message}, user로 재시도`, 'warn');
+    // 후면 실패 → 전면 시도
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false
+      });
+      video.srcObject = stream;
+      await new Promise(res => video.addEventListener('loadeddata', res, { once: true }));
+      log(`비디오 (전면): ${video.videoWidth}x${video.videoHeight}`);
+      resizeOverlay();
+      window.addEventListener('resize', resizeOverlay);
+      if (!objectDetector) objectDetector = await loadMediaPipe();
+      intro.style.display = 'none';
+      buildFilterUI();
+      running = true;
+      statusEl.textContent = '추적 중 (전면 카메라)';
+      statusEl.className = 'ok';
+      requestAnimationFrame(loop);
+    } catch (e2) {
+      log(`시작 완전 실패: ${e2.message}`, 'err');
+      statusEl.textContent = '실패: ' + e2.message;
+      statusEl.className = 'err';
+      startBtn.disabled = false;
+      startBtn.textContent = '다시 시도';
+      logEl.classList.add('show');
+    }
   }
 }
 
-// ========== 손 분석 ==========
-// MediaPipe Hand 랜드마크 인덱스
-// 0: WRIST
-// 1-4: THUMB (CMC, MCP, IP, TIP)
-// 5-8: INDEX
-// 9-12: MIDDLE
-// 13-16: RING
-// 17-20: PINKY
-
-// 손가락이 펴졌는지 판정
-// 손가락 TIP의 y가 PIP(중간 관절)보다 위(작은 y)에 있으면 펴진 것
-function getFingerStates(lm) {
-  // 검지/중지/약지/소지: TIP이 PIP보다 위에 있나
-  const index = lm[8].y < lm[6].y;
-  const middle = lm[12].y < lm[10].y;
-  const ring = lm[16].y < lm[14].y;
-  const pinky = lm[20].y < lm[18].y;
-
-  // 엄지는 좌우로 펴짐 — TIP과 IP의 x 거리
-  // 오른손인지 왼손인지에 따라 방향 다르지만, MCP에서 TIP까지 x 거리로 단순화
-  const thumb = Math.abs(lm[4].x - lm[2].x) > Math.abs(lm[3].x - lm[2].x);
-
-  return { thumb, index, middle, ring, pinky };
-}
-
-// 제스처 분류
-function classifyGesture(lm) {
-  const f = getFingerStates(lm);
-  const count = [f.thumb, f.index, f.middle, f.ring, f.pinky].filter(Boolean).length;
-
-  // 주먹: 다 접힘
-  if (count === 0) return { name: '주먹', emoji: '✊', conf: 0.9 };
-
-  // 검지만: 포인팅
-  if (f.index && !f.middle && !f.ring && !f.pinky && !f.thumb) {
-    return { name: '검지', emoji: '☝️', conf: 0.9 };
-  }
-
-  // V (검지+중지): 가위
-  if (f.index && f.middle && !f.ring && !f.pinky) {
-    return { name: '가위(V)', emoji: '✌️', conf: 0.9 };
-  }
-
-  // 엄지척: 엄지만
-  if (f.thumb && !f.index && !f.middle && !f.ring && !f.pinky) {
-    return { name: '엄지척', emoji: '👍', conf: 0.85 };
-  }
-
-  // OK: 엄지와 검지가 가까이 + 나머지 펴짐
-  const thumbTip = lm[4], indexTip = lm[8];
-  const pinchDist = Math.hypot(thumbTip.x - indexTip.x, thumbTip.y - indexTip.y);
-  if (pinchDist < 0.06 && f.middle && f.ring && f.pinky) {
-    return { name: 'OK', emoji: '👌', conf: 0.85 };
-  }
-
-  // 보: 다 펴짐
-  if (count >= 4) return { name: '보', emoji: '🖐️', conf: 0.9 };
-
-  return { name: '?', emoji: '🤔', conf: 0.3 };
-}
-
-// 핀치 감지 (엄지+검지 거리)
-function isPinching(lm) {
-  const d = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y);
-  return d < 0.05;
-}
-
-// ========== 오버레이 그리기 ==========
-function drawHandOverlay(lm) {
-  octx.clearRect(0, 0, overlay.width, overlay.height);
-  if (!lm) return;
-
-  // 연결선
-  const connections = [
-    [0,1],[1,2],[2,3],[3,4],          // 엄지
-    [0,5],[5,6],[6,7],[7,8],          // 검지
-    [5,9],[9,10],[10,11],[11,12],     // 중지
-    [9,13],[13,14],[14,15],[15,16],   // 약지
-    [13,17],[17,18],[18,19],[19,20],  // 소지
-    [0,17],                            // 손바닥
-  ];
-  octx.strokeStyle = '#4ade80';
-  octx.lineWidth = 2;
-  for (const [a, b] of connections) {
-    octx.beginPath();
-    octx.moveTo(lm[a].x * overlay.width, lm[a].y * overlay.height);
-    octx.lineTo(lm[b].x * overlay.width, lm[b].y * overlay.height);
-    octx.stroke();
-  }
-  // 점
-  octx.fillStyle = '#fff';
-  for (const p of lm) {
-    octx.beginPath();
-    octx.arc(p.x * overlay.width, p.y * overlay.height, 3, 0, Math.PI * 2);
-    octx.fill();
-  }
-}
-
-// ========== 모드별 처리 ==========
-function handlePointerMode(lm) {
-  const indexTip = lm[8];
-  // 좌우 반전 (거울)
-  const x = (1 - indexTip.x) * stage.clientWidth;
-  const y = indexTip.y * stage.clientHeight;
-  const sx = smooth(smoothBuf.x, x);
-  const sy = smooth(smoothBuf.y, y);
-
-  fingerCursor.classList.add('on');
-  fingerCursor.style.left = sx + 'px';
-  fingerCursor.style.top = sy + 'px';
-
-  const pinch = isPinching(lm);
-  fingerCursor.classList.toggle('pinch', pinch);
-
-  // 분면 판정
+function resizeOverlay() {
   const rect = stage.getBoundingClientRect();
-  const normX = sx / rect.width;
-  const normY = sy / rect.height;
-  const q = (normY < 0.5 ? 'T' : 'B') + (normX < 0.5 ? 'L' : 'R');
-  if (q !== currentQuad) {
-    currentQuad = q;
-    for (const k of Object.keys(quads)) {
-      quads[k].classList.toggle('active', k === q);
-    }
-  }
+  overlay.width = rect.width;
+  overlay.height = rect.height;
 }
 
-function handleGestureMode(lm) {
-  const g = classifyGesture(lm);
+// ========== 박스 그리기 ==========
+function drawDetections(detections) {
+  octx.clearRect(0, 0, overlay.width, overlay.height);
+  if (!detections || detections.length === 0) return;
 
-  // 안정화: 같은 제스처가 3프레임 연속이어야 확정
-  if (lastGesture && lastGesture.name === g.name) {
-    gestureStableFrames++;
+  // 비디오의 실제 표시 영역 계산 (object-fit: cover 보정)
+  const videoAspect = video.videoWidth / video.videoHeight;
+  const stageAspect = overlay.width / overlay.height;
+  let scale, offsetX = 0, offsetY = 0;
+  if (videoAspect > stageAspect) {
+    // 비디오가 더 와이드 → 좌우 잘림
+    scale = overlay.height / video.videoHeight;
+    offsetX = (overlay.width - video.videoWidth * scale) / 2;
   } else {
-    gestureStableFrames = 0;
+    scale = overlay.width / video.videoWidth;
+    offsetY = (overlay.height - video.videoHeight * scale) / 2;
   }
-  lastGesture = g;
 
-  if (gestureStableFrames >= 3) {
-    gestureEmoji.textContent = g.emoji;
-    gestureEmoji.classList.add('active');
-    gestureName.textContent = g.name;
-    gestureName.classList.remove('none');
-    gestureConfidence.textContent = `신뢰도 ${(g.conf * 100).toFixed(0)}%`;
+  let visibleCount = 0;
 
-    // 히스토리 추가 (제스처 바뀔 때만)
-    if (gestureHistoryArr.length === 0 ||
-        gestureHistoryArr[gestureHistoryArr.length - 1].name !== g.name) {
-      gestureHistoryArr.push(g);
-      if (gestureHistoryArr.length > 5) gestureHistoryArr.shift();
-      renderGestureHistory();
+  for (const det of detections) {
+    const cat = det.categories[0];
+    const name = cat.categoryName;
+    const score = cat.score;
+
+    if (!isCategoryEnabled(name)) continue;
+    visibleCount++;
+
+    // 발견 기록
+    if (!seenCategories.has(name)) {
+      seenCategories.add(name);
+      log(`새 객체 발견: ${getKoLabel(name)} (${name})`);
+    }
+    recentFoundDisplay.set(name, performance.now());
+
+    // 박스 좌표 (비디오 픽셀 → 캔버스 픽셀)
+    const bb = det.boundingBox;
+    const x = bb.originX * scale + offsetX;
+    const y = bb.originY * scale + offsetY;
+    const w = bb.width * scale;
+    const h = bb.height * scale;
+
+    const color = colorForCategory(name);
+
+    // 박스
+    octx.strokeStyle = color;
+    octx.lineWidth = 3;
+    octx.strokeRect(x, y, w, h);
+
+    // 라벨 (라벨은 거울 반전 안 되게 — 캔버스가 scaleX(-1)이라 텍스트도 뒤집힘)
+    // 해결: 라벨 텍스트만 다시 한 번 뒤집어서 정상으로 보이게
+    octx.save();
+    octx.translate(x + w, y);  // 박스 오른쪽 위로 이동 (반전 기준점)
+    octx.scale(-1, 1);          // 다시 뒤집기
+    const label = `${getKoLabel(name)} ${(score * 100).toFixed(0)}%`;
+    octx.font = 'bold 14px -apple-system, sans-serif';
+    const textW = octx.measureText(label).width;
+    // 배경
+    octx.fillStyle = color;
+    octx.fillRect(0, -22, textW + 12, 22);
+    // 텍스트
+    octx.fillStyle = '#000';
+    octx.fillText(label, 6, -6);
+    octx.restore();
+  }
+
+  countEl.textContent = visibleCount;
+  updateFoundList();
+}
+
+// 최근에 발견된 객체 태그를 우측 상단에 표시
+function updateFoundList() {
+  const now = performance.now();
+  const RECENT_MS = 1500;
+
+  // 1.5초 이상 안 보인 건 제거
+  for (const [name, t] of recentFoundDisplay.entries()) {
+    if (now - t > RECENT_MS) recentFoundDisplay.delete(name);
+  }
+
+  // 현재 활성 태그 다시 렌더
+  const existing = new Map();
+  foundList.querySelectorAll('.found-tag').forEach(el => {
+    existing.set(el.dataset.cat, el);
+  });
+
+  // 추가/유지
+  for (const name of recentFoundDisplay.keys()) {
+    if (!existing.has(name)) {
+      const tag = document.createElement('div');
+      tag.className = 'found-tag';
+      tag.dataset.cat = name;
+      tag.textContent = getKoLabel(name);
+      tag.style.background = colorForCategory(name) + 'e6';
+      foundList.appendChild(tag);
+    } else {
+      existing.delete(name);
     }
   }
-}
-
-function renderGestureHistory() {
-  gestureHistory.innerHTML = '';
-  for (const h of gestureHistoryArr) {
-    const div = document.createElement('div');
-    div.className = 'hist-item';
-    div.textContent = h.emoji;
-    gestureHistory.appendChild(div);
-  }
-}
-
-function handleDrawingMode(lm) {
-  const f = getFingerStates(lm);
-  const onlyIndex = f.index && !f.middle && !f.ring && !f.pinky;
-  const allOpen = f.index && f.middle && f.ring && f.pinky;
-  const fist = !f.index && !f.middle && !f.ring && !f.pinky;
-
-  // 보자기: 전체 지우기
-  if (allOpen) {
-    dctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
-    lastDrawPoint = null;
-    return;
-  }
-
-  // 주먹: 멈춤
-  if (fist) {
-    lastDrawPoint = null;
-    return;
-  }
-
-  // 검지만: 그리기
-  if (onlyIndex) {
-    const indexTip = lm[8];
-    const x = (1 - indexTip.x) * drawCanvas.width;
-    const y = indexTip.y * drawCanvas.height;
-    const sx = smooth(smoothBuf.x, x);
-    const sy = smooth(smoothBuf.y, y);
-
-    if (lastDrawPoint) {
-      dctx.strokeStyle = drawColor;
-      dctx.lineWidth = 4;
-      dctx.lineCap = 'round';
-      dctx.lineJoin = 'round';
-      dctx.beginPath();
-      dctx.moveTo(lastDrawPoint.x, lastDrawPoint.y);
-      dctx.lineTo(sx, sy);
-      dctx.stroke();
-    }
-    lastDrawPoint = { x: sx, y: sy };
-  } else {
-    lastDrawPoint = null;
-  }
-}
-
-// 손 안 보일 때 상태 초기화
-function handleNoHand() {
-  if (currentMode === 'pointer') {
-    fingerCursor.classList.remove('on', 'pinch');
-    for (const k of Object.keys(quads)) quads[k].classList.remove('active');
-    currentQuad = null;
-  } else if (currentMode === 'gesture') {
-    gestureEmoji.classList.remove('active');
-    gestureName.classList.add('none');
-    gestureName.textContent = '손을 보여주세요';
-    gestureConfidence.textContent = '대기 중';
-    gestureStableFrames = 0;
-  } else if (currentMode === 'drawing') {
-    lastDrawPoint = null;
+  // 제거
+  for (const el of existing.values()) {
+    el.remove();
   }
 }
 
@@ -715,17 +603,17 @@ function loop() {
   if (video.currentTime !== lastVideoTime) {
     lastVideoTime = video.currentTime;
     try {
-      const result = handLandmarker.detectForVideo(video, performance.now());
-      if (result.landmarks && result.landmarks.length > 0) {
-        const lm = result.landmarks[0];
-        drawHandOverlay(lm);
+      const result = objectDetector.detectForVideo(video, performance.now());
+      drawDetections(result.detections);
 
-        if (currentMode === 'pointer') handlePointerMode(lm);
-        else if (currentMode === 'gesture') handleGestureMode(lm);
-        else if (currentMode === 'drawing') handleDrawingMode(lm);
-      } else {
-        octx.clearRect(0, 0, overlay.width, overlay.height);
-        handleNoHand();
+      // FPS
+      frameCount++;
+      const now = performance.now();
+      if (now - lastFpsTime > 1000) {
+        const fps = (frameCount * 1000 / (now - lastFpsTime)).toFixed(0);
+        fpsEl.textContent = `${fps} fps`;
+        frameCount = 0;
+        lastFpsTime = now;
       }
     } catch (e) {
       log(`detect 오류: ${e.message}`, 'err');
@@ -734,42 +622,10 @@ function loop() {
   requestAnimationFrame(loop);
 }
 
-// ========== 탭 전환 ==========
-tabs.forEach(tab => {
-  tab.addEventListener('click', () => {
-    const mode = tab.dataset.mode;
-    tabs.forEach(t => t.classList.toggle('active', t === tab));
-    modes.forEach(m => m.classList.toggle('active', m.id === `${mode}-mode`));
-    currentMode = mode;
-    smoothBuf.x = [];
-    smoothBuf.y = [];
-    handleNoHand();
-    if (mode === 'drawing') resizeDrawCanvas();
-    log(`모드 전환: ${mode}`);
-  });
-});
-
-// ========== 색상 선택 ==========
-document.querySelectorAll('.color-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    drawColor = btn.dataset.color;
-  });
-});
-
-// ========== 버튼 ==========
+// ========== UI ==========
 startBtn.addEventListener('click', startApp);
-togglePreviewBtn.addEventListener('click', () => preview.classList.toggle('on'));
+toggleFilterBtn.addEventListener('click', () => filterPanel.classList.toggle('on'));
 toggleLogBtn.addEventListener('click', () => logEl.classList.toggle('show'));
-clearBtn.addEventListener('click', () => {
-  if (currentMode === 'drawing') {
-    dctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
-  } else if (currentMode === 'gesture') {
-    gestureHistoryArr = [];
-    renderGestureHistory();
-  }
-});
 
 log('초기화 완료. 시작 버튼을 눌러주세요.');
 </script>
