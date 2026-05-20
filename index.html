@@ -232,6 +232,9 @@
   <div class="tune-row">
     <label><input type="checkbox" id="c-flipx" checked> 좌우 반전 (거울)</label>
   </div>
+  <div class="tune-row">
+    <label><input type="checkbox" id="c-flipy"> 상하 반전</label>
+  </div>
 </div>
 
 <div id="preview">
@@ -337,6 +340,9 @@ setTimeout(() => {
   bindSlider('s-yaw', 'headYawGain', 'v-yaw');
   document.getElementById('c-flipx').addEventListener('change', (e) => {
     GAZE_PARAMS.flipX = e.target.checked;
+  });
+  document.getElementById('c-flipy').addEventListener('change', (e) => {
+    GAZE_PARAMS.flipY = e.target.checked;
   });
 }, 0);
 
@@ -473,6 +479,7 @@ async function startCamera() {
 // 튜닝 파라미터 — 폰/사용자에 맞게 조정 가능
 const GAZE_PARAMS = {
   flipX: true,           // 거울 모드 보정 (좌우 반전)
+  flipY: false,          // 상하 반전 (머리/눈동자 Y 방향 보정)
   eyeXGain: 1.0,         // 눈동자 X 민감도
   eyeYGain: 2.5,         // 눈동자 Y 민감도 (위/아래는 범위가 좁아서 크게)
   headYawGain: 0.8,      // 머리 좌우 회전 가중치
@@ -519,6 +526,8 @@ function estimateGaze(landmarks, matrix) {
 
   // 좌우 반전 (거울 모드 보정)
   if (GAZE_PARAMS.flipX) screenX = 1 - screenX;
+  // 상하 반전
+  if (GAZE_PARAMS.flipY) screenY = 1 - screenY;
 
   // 클램프
   screenX = Math.max(0, Math.min(1, screenX));
