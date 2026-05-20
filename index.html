@@ -3,39 +3,28 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>모바일 시선 추적</title>
+<title>모바일 시선 추적 v3</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
-    height: 100%;
-    overflow: hidden;
+    height: 100%; overflow: hidden;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: #0a0a0a;
-    color: #fff;
-    touch-action: none;
+    background: #0a0a0a; color: #fff; touch-action: none;
   }
-  #app {
-    position: fixed;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-  }
+  #app { position: fixed; inset: 0; display: flex; flex-direction: column; }
+
+  /* 4분면 */
   #quadrants {
     flex: 1;
     display: grid;
     grid-template-columns: 1fr 1fr;
     grid-template-rows: 1fr 1fr;
-    gap: 2px;
-    background: #2a2a2a;
+    gap: 2px; background: #2a2a2a;
   }
   .quad {
     background: #1a1a1a;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 48px;
-    font-weight: 700;
-    color: #444;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 48px; font-weight: 700; color: #444;
     transition: background 0.15s, color 0.15s;
     position: relative;
   }
@@ -51,130 +40,137 @@
   }
   .quad.active .gaze-time { color: rgba(255,255,255,0.8); }
 
+  /* 시선 점 (디버그용) */
+  #gaze-dot {
+    position: fixed;
+    width: 24px; height: 24px;
+    background: rgba(74,222,128,0.5);
+    border: 2px solid #4ade80;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 50;
+    transform: translate(-50%,-50%);
+    display: none;
+    transition: top 0.06s linear, left 0.06s linear;
+  }
+  #gaze-dot.on { display: block; }
+
+  /* 패널 */
   #panel {
     background: #0a0a0a;
     border-top: 1px solid #2a2a2a;
     padding: 12px;
-    display: flex;
-    gap: 8px;
-    align-items: center;
+    display: flex; gap: 8px; align-items: center;
+    flex-wrap: wrap;
   }
   #status {
-    flex: 1; font-size: 12px; color: #888; line-height: 1.4;
+    flex: 1 1 100%; font-size: 12px; color: #888; line-height: 1.4;
+    margin-bottom: 4px;
   }
   #status.ok { color: #4ade80; }
   #status.err { color: #ef4444; }
   button {
-    padding: 10px 16px;
-    background: #2563eb;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
+    padding: 10px 14px;
+    background: #2563eb; color: white;
+    border: none; border-radius: 8px;
+    font-size: 13px; font-weight: 500; cursor: pointer;
   }
   button:disabled { background: #374151; opacity: 0.6; }
   button.secondary { background: #374151; }
+  button.success { background: #16a34a; }
 
+  /* 카메라 프리뷰 */
   #preview {
     position: fixed;
     top: 12px; right: 12px;
-    width: 100px; height: 130px;
+    width: 90px; height: 120px;
     border-radius: 8px;
     overflow: hidden;
     border: 1px solid #2a2a2a;
     background: #000;
-    z-index: 100;
-    display: none;
+    z-index: 100; display: none;
   }
   #preview.on { display: block; }
   #video, #overlay {
-    position: absolute; inset: 0;
-    width: 100%; height: 100%;
+    position: absolute; inset: 0; width: 100%; height: 100%;
     transform: scaleX(-1);
   }
 
+  /* 인트로 */
   #intro {
     position: fixed; inset: 0;
     background: rgba(10,10,10,0.98);
     z-index: 1000;
-    display: flex;
-    align-items: center; justify-content: center;
+    display: flex; align-items: center; justify-content: center;
     padding: 24px;
   }
   .intro-card { max-width: 360px; text-align: center; }
   .intro-card h1 { font-size: 22px; margin-bottom: 16px; }
-  .intro-card p {
-    color: #aaa; font-size: 14px; line-height: 1.6; margin-bottom: 20px;
-  }
+  .intro-card p { color: #aaa; font-size: 14px; line-height: 1.6; margin-bottom: 20px; }
   .intro-card ul {
     text-align: left; color: #888; font-size: 13px;
     line-height: 1.8; margin-bottom: 20px; padding-left: 20px;
   }
   .intro-card button { width: 100%; padding: 14px; font-size: 15px; }
 
-  /* 에러/로그 출력 박스 */
+  /* 캘리브레이션 오버레이 */
+  #cal-overlay {
+    position: fixed; inset: 0;
+    background: #000;
+    z-index: 800;
+    display: none;
+  }
+  #cal-overlay.on { display: block; }
+  #cal-dot {
+    position: absolute;
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #ef4444 30%, rgba(239,68,68,0.3) 70%, transparent);
+    transform: translate(-50%,-50%);
+    transition: top 0.6s ease, left 0.6s ease;
+  }
+  #cal-dot.collecting {
+    animation: pulse 0.6s ease-in-out infinite alternate;
+  }
+  @keyframes pulse {
+    from { transform: translate(-50%,-50%) scale(1); }
+    to { transform: translate(-50%,-50%) scale(1.4); }
+  }
+  #cal-progress {
+    position: absolute;
+    bottom: 60px; left: 50%;
+    transform: translateX(-50%);
+    color: #fff; font-size: 16px; text-align: center;
+    width: 90%;
+  }
+  #cal-progress .ring {
+    width: 60px; height: 60px;
+    margin: 12px auto;
+    border: 4px solid #2a2a2a;
+    border-top-color: #4ade80;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* 로그 */
   #log {
     position: fixed;
     left: 12px; right: 12px; bottom: 80px;
-    max-height: 200px;
-    overflow-y: auto;
-    background: rgba(0,0,0,0.85);
+    max-height: 200px; overflow-y: auto;
+    background: rgba(0,0,0,0.9);
     border: 1px solid #2a2a2a;
     border-radius: 8px;
     padding: 10px;
     font-family: 'SF Mono', Menlo, monospace;
-    font-size: 11px;
-    color: #4ade80;
+    font-size: 11px; color: #4ade80;
     z-index: 2000;
     display: none;
-    white-space: pre-wrap;
-    word-break: break-all;
+    white-space: pre-wrap; word-break: break-all;
   }
   #log.show { display: block; }
   #log .err { color: #ef4444; }
   #log .warn { color: #f59e0b; }
-
-  /* 튜닝 패널 */
-  #tune-panel {
-    position: fixed;
-    left: 12px; right: 12px; bottom: 80px;
-    background: rgba(0,0,0,0.92);
-    border: 1px solid #2a2a2a;
-    border-radius: 8px;
-    padding: 12px;
-    z-index: 1500;
-    display: none;
-  }
-  #tune-panel.show { display: block; }
-  .tune-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 8px;
-    font-size: 12px;
-    color: #ccc;
-  }
-  .tune-row:last-child { margin-bottom: 0; }
-  .tune-row label {
-    flex: 0 0 120px;
-    display: flex;
-    justify-content: space-between;
-    gap: 4px;
-  }
-  .tune-row label span {
-    color: #4ade80;
-    font-variant-numeric: tabular-nums;
-  }
-  .tune-row input[type=range] {
-    flex: 1;
-    accent-color: #2563eb;
-  }
-  .tune-row input[type=checkbox] {
-    margin-right: 6px;
-    accent-color: #2563eb;
-  }
 </style>
 </head>
 <body>
@@ -201,41 +197,15 @@
 
   <div id="panel">
     <div id="status">대기 중</div>
+    <button id="recal-btn" class="secondary" disabled>재캘리브레이션</button>
+    <button id="toggle-dot" class="secondary">시선점</button>
     <button id="toggle-preview" class="secondary">카메라</button>
     <button id="toggle-log" class="secondary">로그</button>
-    <button id="toggle-tune" class="secondary">튜닝</button>
     <button id="reset-btn" class="secondary">리셋</button>
   </div>
 </div>
 
-<div id="tune-panel">
-  <div class="tune-row">
-    <label>Y 민감도 <span id="v-eyeY">2.5</span></label>
-    <input type="range" id="s-eyeY" min="0.5" max="5" step="0.1" value="2.5">
-  </div>
-  <div class="tune-row">
-    <label>머리 끄덕임 <span id="v-pitch">2.0</span></label>
-    <input type="range" id="s-pitch" min="0" max="5" step="0.1" value="2.0">
-  </div>
-  <div class="tune-row">
-    <label>Y 중심 보정 <span id="v-yoff">-0.15</span></label>
-    <input type="range" id="s-yoff" min="-0.4" max="0.4" step="0.01" value="-0.15">
-  </div>
-  <div class="tune-row">
-    <label>X 민감도 <span id="v-eyeX">1.0</span></label>
-    <input type="range" id="s-eyeX" min="0.5" max="3" step="0.1" value="1.0">
-  </div>
-  <div class="tune-row">
-    <label>머리 좌우 <span id="v-yaw">0.8</span></label>
-    <input type="range" id="s-yaw" min="0" max="3" step="0.1" value="0.8">
-  </div>
-  <div class="tune-row">
-    <label><input type="checkbox" id="c-flipx" checked> 좌우 반전 (거울)</label>
-  </div>
-  <div class="tune-row">
-    <label><input type="checkbox" id="c-flipy"> 상하 반전</label>
-  </div>
-</div>
+<div id="gaze-dot"></div>
 
 <div id="preview">
   <video id="video" autoplay playsinline muted></video>
@@ -244,22 +214,31 @@
 
 <div id="intro">
   <div class="intro-card">
-    <h1>👁️ 모바일 시선 추적</h1>
-    <p>전면 카메라로 얼굴/홍채를 추적해서<br>화면의 4분면 중 어디를 보는지 표시합니다.</p>
+    <h1>👁️ 시선 추적 v3</h1>
+    <p>캘리브레이션으로 개인별 보정을 합니다.<br>5개 점을 차례로 응시하기만 하면 돼요.</p>
     <ul>
-      <li>폰을 정면에서 30~40cm</li>
-      <li>밝은 조명, 안경 반사 주의</li>
-      <li>머리는 가급적 고정</li>
-      <li>처음 시작 시 모델 다운로드 5~15초</li>
+      <li>폰을 거치하거나 양손으로 안정적으로</li>
+      <li>밝은 조명, 정면 응시</li>
+      <li>캘리브레이션 중에는 머리 고정</li>
+      <li>점이 보이면 그 점을 따라 시선만 이동</li>
     </ul>
-    <button id="start-btn">카메라 시작</button>
+    <button id="start-btn">시작하기</button>
+  </div>
+</div>
+
+<div id="cal-overlay">
+  <div id="cal-dot"></div>
+  <div id="cal-progress">
+    <div id="cal-text">점을 응시하세요</div>
+    <div class="ring"></div>
+    <div id="cal-counter" style="font-size:13px;color:#888;margin-top:8px;">1 / 5</div>
   </div>
 </div>
 
 <div id="log"></div>
 
 <script>
-// ========== 로깅 (화면에 표시) ==========
+// ========== 로깅 ==========
 const logEl = document.getElementById('log');
 function log(msg, type = 'info') {
   const line = document.createElement('div');
@@ -271,7 +250,6 @@ function log(msg, type = 'info') {
   console.log(`[${type}]`, msg);
 }
 
-// 글로벌 에러 캐치
 window.addEventListener('error', (e) => {
   log(`ERROR: ${e.message} @ ${e.filename}:${e.lineno}`, 'err');
   logEl.classList.add('show');
@@ -281,31 +259,27 @@ window.addEventListener('unhandledrejection', (e) => {
   logEl.classList.add('show');
 });
 
-// ========== 환경 체크 ==========
 log('페이지 로드 완료');
-log(`UA: ${navigator.userAgent.substring(0, 80)}...`);
 log(`Protocol: ${location.protocol}`);
 
-if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-  log('⚠ HTTPS가 아닙니다. 카메라 접근 차단될 수 있음', 'warn');
-  logEl.classList.add('show');
-}
-if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-  log('⚠ getUserMedia 미지원 브라우저', 'err');
-  logEl.classList.add('show');
-}
-
-// ========== UI 핸들러 (즉시 등록) ==========
+// ========== DOM ==========
 const startBtn = document.getElementById('start-btn');
+const recalBtn = document.getElementById('recal-btn');
 const resetBtn = document.getElementById('reset-btn');
 const togglePreviewBtn = document.getElementById('toggle-preview');
 const toggleLogBtn = document.getElementById('toggle-log');
+const toggleDotBtn = document.getElementById('toggle-dot');
 const statusEl = document.getElementById('status');
 const intro = document.getElementById('intro');
 const preview = document.getElementById('preview');
 const video = document.getElementById('video');
 const overlay = document.getElementById('overlay');
 const octx = overlay.getContext('2d');
+const gazeDot = document.getElementById('gaze-dot');
+const calOverlay = document.getElementById('cal-overlay');
+const calDot = document.getElementById('cal-dot');
+const calText = document.getElementById('cal-text');
+const calCounter = document.getElementById('cal-counter');
 
 const quads = {
   TL: document.querySelector('[data-q="TL"]'),
@@ -314,180 +288,34 @@ const quads = {
   BR: document.querySelector('[data-q="BR"]'),
 };
 
-toggleLogBtn.addEventListener('click', () => logEl.classList.toggle('show'));
-togglePreviewBtn.addEventListener('click', () => preview.classList.toggle('on'));
-
-// 튜닝 패널
-const tunePanel = document.getElementById('tune-panel');
-const toggleTuneBtn = document.getElementById('toggle-tune');
-toggleTuneBtn.addEventListener('click', () => tunePanel.classList.toggle('show'));
-
-function bindSlider(id, paramKey, valueId) {
-  const slider = document.getElementById(id);
-  const display = document.getElementById(valueId);
-  slider.addEventListener('input', () => {
-    const v = parseFloat(slider.value);
-    GAZE_PARAMS[paramKey] = v;
-    display.textContent = v.toFixed(2);
-  });
-}
-// GAZE_PARAMS는 아래에 정의되지만, 슬라이더는 시작 후 동작하므로 OK
-setTimeout(() => {
-  bindSlider('s-eyeY', 'eyeYGain', 'v-eyeY');
-  bindSlider('s-pitch', 'headPitchGain', 'v-pitch');
-  bindSlider('s-yoff', 'yCenterOffset', 'v-yoff');
-  bindSlider('s-eyeX', 'eyeXGain', 'v-eyeX');
-  bindSlider('s-yaw', 'headYawGain', 'v-yaw');
-  document.getElementById('c-flipx').addEventListener('change', (e) => {
-    GAZE_PARAMS.flipX = e.target.checked;
-  });
-  document.getElementById('c-flipy').addEventListener('change', (e) => {
-    GAZE_PARAMS.flipY = e.target.checked;
-  });
-}, 0);
-
-let gazeTimes = { TL: 0, TR: 0, BL: 0, BR: 0 };
-resetBtn.addEventListener('click', () => {
-  gazeTimes = { TL: 0, TR: 0, BL: 0, BR: 0 };
-  for (const k of Object.keys(quads)) {
-    quads[k].querySelector('.gaze-time').textContent = '0.0s';
-  }
-  log('통계 리셋');
-});
-
-// ========== 메인 로직 ==========
+// ========== 상태 ==========
 let faceLandmarker = null;
 let running = false;
 let lastVideoTime = -1;
 let currentQuad = null;
+let gazeTimes = { TL: 0, TR: 0, BL: 0, BR: 0 };
 let lastTickTime = performance.now();
-const smoothBuffer = { x: [], y: [], size: 6 };
+let showGazeDot = false;
 
+// 캘리브레이션 매핑 (raw → screen): screen = A * raw + B
+// 초기값은 항등 매핑
+let calibration = {
+  done: false,
+  // 매핑 계수 (X, Y 각각)
+  ax: 1, bx: 0,
+  ay: 1, by: 0,
+};
+
+// 스무딩
+const smoothBuffer = { x: [], y: [], size: 8 };
 function smooth(buf, val) {
   buf.push(val);
   if (buf.length > smoothBuffer.size) buf.shift();
   return buf.reduce((a, b) => a + b, 0) / buf.length;
 }
 
-async function loadMediaPipe() {
-  log('MediaPipe 모듈 로딩 시작...');
-  statusEl.textContent = 'MediaPipe 모듈 다운로드 중...';
-
-  // ES module을 동적 import (catch 가능)
-  let vision;
-  try {
-    vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/vision_bundle.mjs');
-    log('vision_bundle 로드 성공');
-  } catch (e) {
-    log(`vision_bundle 로드 실패: ${e.message}`, 'err');
-    throw e;
-  }
-
-  const { FilesetResolver, FaceLandmarker } = vision;
-
-  log('WASM fileset 로딩...');
-  const filesetResolver = await FilesetResolver.forVisionTasks(
-    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/wasm"
-  );
-  log('WASM fileset 로드 성공');
-
-  log('FaceLandmarker 모델 다운로드 (~5MB)...');
-  statusEl.textContent = '모델 다운로드 중 (5~15초)...';
-
-  // GPU delegate가 iOS에서 실패하면 CPU로 fallback
-  let landmarker;
-  try {
-    landmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
-      baseOptions: {
-        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
-        delegate: "GPU"
-      },
-      outputFacialTransformationMatrixes: true,
-      runningMode: "VIDEO",
-      numFaces: 1
-    });
-    log('FaceLandmarker 생성 성공 (GPU)');
-  } catch (e) {
-    log(`GPU 실패, CPU로 재시도: ${e.message}`, 'warn');
-    landmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
-      baseOptions: {
-        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
-        delegate: "CPU"
-      },
-      outputFacialTransformationMatrixes: true,
-      runningMode: "VIDEO",
-      numFaces: 1
-    });
-    log('FaceLandmarker 생성 성공 (CPU)');
-  }
-
-  return landmarker;
-}
-
-async function startCamera() {
-  startBtn.disabled = true;
-  startBtn.textContent = '로딩 중...';
-  log('=== 시작 버튼 클릭됨 ===');
-
-  try {
-    // 1. 먼저 카메라 권한 요청 (사용자 제스처 직후라야 iOS에서 통과)
-    log('카메라 권한 요청...');
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: 'user',
-        width: { ideal: 640 },
-        height: { ideal: 480 }
-      },
-      audio: false
-    });
-    log('카메라 권한 획득');
-    video.srcObject = stream;
-
-    await new Promise((res, rej) => {
-      video.addEventListener('loadeddata', res, { once: true });
-      setTimeout(() => rej(new Error('비디오 로딩 타임아웃')), 10000);
-    });
-    log(`비디오 준비: ${video.videoWidth}x${video.videoHeight}`);
-
-    overlay.width = video.videoWidth;
-    overlay.height = video.videoHeight;
-
-    // 2. MediaPipe 로드 (시간 걸리는 작업)
-    if (!faceLandmarker) {
-      faceLandmarker = await loadMediaPipe();
-    }
-
-    // 3. 시작
-    intro.style.display = 'none';
-    running = true;
-    statusEl.textContent = '추적 중';
-    statusEl.classList.remove('err');
-    statusEl.classList.add('ok');
-    log('=== 추적 시작 ===');
-    lastTickTime = performance.now();
-    requestAnimationFrame(loop);
-  } catch (e) {
-    log(`시작 실패: ${e.name}: ${e.message}`, 'err');
-    logEl.classList.add('show');
-    statusEl.textContent = '실패: ' + e.message;
-    statusEl.classList.add('err');
-    startBtn.disabled = false;
-    startBtn.textContent = '다시 시도';
-  }
-}
-
-// 튜닝 파라미터 — 폰/사용자에 맞게 조정 가능
-const GAZE_PARAMS = {
-  flipX: true,           // 거울 모드 보정 (좌우 반전)
-  flipY: false,          // 상하 반전 (머리/눈동자 Y 방향 보정)
-  eyeXGain: 1.0,         // 눈동자 X 민감도
-  eyeYGain: 2.5,         // 눈동자 Y 민감도 (위/아래는 범위가 좁아서 크게)
-  headYawGain: 0.8,      // 머리 좌우 회전 가중치
-  headPitchGain: 2.0,    // 머리 끄덕임 가중치 (Y도 크게)
-  yCenterOffset: -0.15,  // 폰을 살짝 아래로 들어서 정면이 0.5보다 아래로 잡히는 것 보정
-};
-
-function estimateGaze(landmarks, matrix) {
+// ========== 시선 raw 값 계산 ==========
+function getRawGaze(landmarks, matrix) {
   const lIris = landmarks[468];
   const rIris = landmarks[473];
   const lEyeOuter = landmarks[33];
@@ -499,7 +327,6 @@ function estimateGaze(landmarks, matrix) {
   const rEyeTop = landmarks[386];
   const rEyeBottom = landmarks[374];
 
-  // 눈동자 상대 위치 (0~1)
   const lRelX = (lIris.x - lEyeOuter.x) / (lEyeInner.x - lEyeOuter.x);
   const rRelX = (rIris.x - rEyeInner.x) / (rEyeOuter.x - rEyeInner.x);
   const eyeX = (lRelX + rRelX) / 2;
@@ -508,11 +335,6 @@ function estimateGaze(landmarks, matrix) {
   const rRelY = (rIris.y - rEyeTop.y) / (rEyeBottom.y - rEyeTop.y);
   const eyeY = (lRelY + rRelY) / 2;
 
-  // 중심(0.5) 기준으로 편차 계산 후 게인 적용
-  const eyeDx = (eyeX - 0.5) * GAZE_PARAMS.eyeXGain;
-  const eyeDy = (eyeY - 0.5) * GAZE_PARAMS.eyeYGain;
-
-  // 머리 회전
   let headYaw = 0, headPitch = 0;
   if (matrix && matrix.data) {
     const m = matrix.data;
@@ -520,19 +342,143 @@ function estimateGaze(landmarks, matrix) {
     headPitch = Math.atan2(-m[9], Math.sqrt(m[1]*m[1] + m[5]*m[5]));
   }
 
-  // 합성: 중심(0.5) + 눈동자 편차 + 머리 회전
-  let screenX = 0.5 + eyeDx + headYaw * GAZE_PARAMS.headYawGain;
-  let screenY = 0.5 + eyeDy + headPitch * GAZE_PARAMS.headPitchGain + GAZE_PARAMS.yCenterOffset;
+  // raw 값: 눈동자 위치와 머리 회전 결합
+  // 캘리브레이션이 가중치를 학습하므로 여기선 단순 합성
+  const rawX = eyeX + headYaw;
+  const rawY = eyeY + headPitch;
 
-  // 좌우 반전 (거울 모드 보정)
-  if (GAZE_PARAMS.flipX) screenX = 1 - screenX;
-  // 상하 반전
-  if (GAZE_PARAMS.flipY) screenY = 1 - screenY;
+  return { rawX, rawY };
+}
 
-  // 클램프
-  screenX = Math.max(0, Math.min(1, screenX));
-  screenY = Math.max(0, Math.min(1, screenY));
-  return { x: screenX, y: screenY };
+// ========== 캘리브레이션 ==========
+const CAL_POINTS = [
+  { name: '좌상', xPct: 12, yPct: 12 },
+  { name: '우상', xPct: 88, yPct: 12 },
+  { name: '중앙', xPct: 50, yPct: 50 },
+  { name: '좌하', xPct: 12, yPct: 88 },
+  { name: '우하', xPct: 88, yPct: 88 },
+];
+
+// 캘리브레이션 데이터: 각 점에서 수집한 [rawX, rawY] 평균
+let calSamples = [];
+let calCollecting = false;
+let calCurrentRaw = { sx: 0, sy: 0, n: 0 };
+
+async function runCalibration() {
+  log('=== 캘리브레이션 시작 ===');
+  calOverlay.classList.add('on');
+  calSamples = [];
+
+  // 점 표시 → 0.8초 대기(시선 이동) → 1.5초 수집 → 다음 점
+  for (let i = 0; i < CAL_POINTS.length; i++) {
+    const pt = CAL_POINTS[i];
+    calDot.style.left = pt.xPct + '%';
+    calDot.style.top = pt.yPct + '%';
+    calText.textContent = `"${pt.name}" 점을 응시하세요`;
+    calCounter.textContent = `${i + 1} / ${CAL_POINTS.length}`;
+    calDot.classList.remove('collecting');
+
+    // 시선 이동 시간
+    await sleep(800);
+
+    // 수집 시작
+    calDot.classList.add('collecting');
+    calCurrentRaw = { sx: 0, sy: 0, n: 0 };
+    calCollecting = true;
+    await sleep(1500);
+    calCollecting = false;
+
+    if (calCurrentRaw.n < 10) {
+      log(`점 ${pt.name}: 샘플 부족 (${calCurrentRaw.n}). 얼굴이 안 잡힌 듯`, 'warn');
+      // 실패해도 계속 진행 (마지막에 검증)
+    }
+    const avgX = calCurrentRaw.sx / Math.max(1, calCurrentRaw.n);
+    const avgY = calCurrentRaw.sy / Math.max(1, calCurrentRaw.n);
+    calSamples.push({
+      rawX: avgX, rawY: avgY,
+      screenX: pt.xPct / 100,
+      screenY: pt.yPct / 100,
+      samples: calCurrentRaw.n,
+      name: pt.name,
+    });
+    log(`점 ${pt.name}: raw=(${avgX.toFixed(3)}, ${avgY.toFixed(3)}), n=${calCurrentRaw.n}`);
+  }
+
+  // 매핑 계산 (선형회귀)
+  const ok = computeCalibration();
+  calOverlay.classList.remove('on');
+
+  if (ok) {
+    calibration.done = true;
+    log('=== 캘리브레이션 완료 ===');
+    log(`X: screen = ${calibration.ax.toFixed(3)} * raw + ${calibration.bx.toFixed(3)}`);
+    log(`Y: screen = ${calibration.ay.toFixed(3)} * raw + ${calibration.by.toFixed(3)}`);
+    statusEl.textContent = '추적 중 (캘리브레이션 완료)';
+    statusEl.className = 'ok';
+    recalBtn.disabled = false;
+  } else {
+    log('캘리브레이션 실패 — 다시 시도하세요', 'err');
+    statusEl.textContent = '캘리브레이션 실패';
+    statusEl.className = 'err';
+    recalBtn.disabled = false;
+    logEl.classList.add('show');
+  }
+}
+
+// 최소제곱법으로 1차 매핑 계수 구하기
+// screen_x = ax * rawX + bx  (Y도 동일)
+function computeCalibration() {
+  if (calSamples.length < 3) return false;
+
+  // X 매핑
+  const xResult = linearRegression(
+    calSamples.map(s => s.rawX),
+    calSamples.map(s => s.screenX)
+  );
+  // Y 매핑
+  const yResult = linearRegression(
+    calSamples.map(s => s.rawY),
+    calSamples.map(s => s.screenY)
+  );
+
+  if (!xResult || !yResult) return false;
+
+  calibration.ax = xResult.a;
+  calibration.bx = xResult.b;
+  calibration.ay = yResult.a;
+  calibration.by = yResult.b;
+  return true;
+}
+
+function linearRegression(xs, ys) {
+  const n = xs.length;
+  if (n < 2) return null;
+  let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+  for (let i = 0; i < n; i++) {
+    sumX += xs[i];
+    sumY += ys[i];
+    sumXY += xs[i] * ys[i];
+    sumXX += xs[i] * xs[i];
+  }
+  const meanX = sumX / n;
+  const meanY = sumY / n;
+  const denom = sumXX - n * meanX * meanX;
+  if (Math.abs(denom) < 1e-9) return null; // 모든 raw가 같으면 매핑 불가
+  const a = (sumXY - n * meanX * meanY) / denom;
+  const b = meanY - a * meanX;
+  return { a, b };
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ========== 시선 → 화면 좌표 ==========
+function rawToScreen(rawX, rawY) {
+  let sx = calibration.ax * rawX + calibration.bx;
+  let sy = calibration.ay * rawY + calibration.by;
+  return {
+    x: Math.max(0, Math.min(1, sx)),
+    y: Math.max(0, Math.min(1, sy)),
+  };
 }
 
 function quadrantOf(x, y) {
@@ -567,6 +513,88 @@ function drawOverlay(landmarks) {
   }
 }
 
+// ========== MediaPipe 로딩 ==========
+async function loadMediaPipe() {
+  log('MediaPipe 로딩...');
+  const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/vision_bundle.mjs');
+  const { FilesetResolver, FaceLandmarker } = vision;
+  const filesetResolver = await FilesetResolver.forVisionTasks(
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/wasm"
+  );
+  log('모델 다운로드 중...');
+  let landmarker;
+  try {
+    landmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+      baseOptions: {
+        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+        delegate: "GPU"
+      },
+      outputFacialTransformationMatrixes: true,
+      runningMode: "VIDEO",
+      numFaces: 1
+    });
+    log('GPU 모드');
+  } catch (e) {
+    log(`GPU 실패, CPU로: ${e.message}`, 'warn');
+    landmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+      baseOptions: {
+        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+        delegate: "CPU"
+      },
+      outputFacialTransformationMatrixes: true,
+      runningMode: "VIDEO",
+      numFaces: 1
+    });
+    log('CPU 모드');
+  }
+  return landmarker;
+}
+
+// ========== 시작 ==========
+async function startApp() {
+  startBtn.disabled = true;
+  startBtn.textContent = '준비 중...';
+
+  try {
+    log('카메라 권한 요청');
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+      audio: false
+    });
+    video.srcObject = stream;
+    await new Promise((res, rej) => {
+      video.addEventListener('loadeddata', res, { once: true });
+      setTimeout(() => rej(new Error('비디오 타임아웃')), 10000);
+    });
+    overlay.width = video.videoWidth;
+    overlay.height = video.videoHeight;
+    log(`비디오: ${video.videoWidth}x${video.videoHeight}`);
+
+    if (!faceLandmarker) {
+      faceLandmarker = await loadMediaPipe();
+    }
+
+    intro.style.display = 'none';
+    running = true;
+    statusEl.textContent = '캘리브레이션 진행 중...';
+    statusEl.className = '';
+    lastTickTime = performance.now();
+    requestAnimationFrame(loop);
+
+    // 짧게 대기 후 캘리브레이션 자동 시작
+    await sleep(500);
+    await runCalibration();
+  } catch (e) {
+    log(`시작 실패: ${e.message}`, 'err');
+    statusEl.textContent = '실패: ' + e.message;
+    statusEl.className = 'err';
+    startBtn.disabled = false;
+    startBtn.textContent = '다시 시도';
+    logEl.classList.add('show');
+  }
+}
+
+// ========== 메인 루프 ==========
 function loop() {
   if (!running) return;
   const now = performance.now();
@@ -582,18 +610,36 @@ function loop() {
         const matrix = result.facialTransformationMatrixes
           ? result.facialTransformationMatrixes[0]
           : null;
-        const gaze = estimateGaze(landmarks, matrix);
-        const sx = smooth(smoothBuffer.x, gaze.x);
-        const sy = smooth(smoothBuffer.y, gaze.y);
-        const q = quadrantOf(sx, sy);
-        if (q !== currentQuad) {
-          currentQuad = q;
-          updateQuadUI(q);
+        const { rawX, rawY } = getRawGaze(landmarks, matrix);
+
+        // 캘리브레이션 수집 중이면 raw 값 누적
+        if (calCollecting) {
+          calCurrentRaw.sx += rawX;
+          calCurrentRaw.sy += rawY;
+          calCurrentRaw.n++;
         }
-        updateGazeTime(q, deltaSec);
+
+        // 캘리브레이션 완료 후에만 분면 판정
+        if (calibration.done) {
+          const screen = rawToScreen(rawX, rawY);
+          const sx = smooth(smoothBuffer.x, screen.x);
+          const sy = smooth(smoothBuffer.y, screen.y);
+
+          // 시선 점 표시
+          if (showGazeDot) {
+            gazeDot.style.left = (sx * window.innerWidth) + 'px';
+            gazeDot.style.top = (sy * window.innerHeight) + 'px';
+          }
+
+          const q = quadrantOf(sx, sy);
+          if (q !== currentQuad) {
+            currentQuad = q;
+            updateQuadUI(q);
+          }
+          updateGazeTime(q, deltaSec);
+        }
+
         drawOverlay(landmarks);
-      } else {
-        octx.clearRect(0, 0, overlay.width, overlay.height);
       }
     } catch (e) {
       log(`detect 오류: ${e.message}`, 'err');
@@ -602,9 +648,29 @@ function loop() {
   requestAnimationFrame(loop);
 }
 
-// 시작 버튼은 마지막에 바인딩 (모든 함수 정의 후)
-startBtn.addEventListener('click', startCamera);
-log('시작 버튼 핸들러 등록 완료. 버튼을 눌러주세요.');
+// ========== UI 핸들러 ==========
+startBtn.addEventListener('click', startApp);
+recalBtn.addEventListener('click', async () => {
+  recalBtn.disabled = true;
+  calibration.done = false;
+  statusEl.textContent = '재캘리브레이션 중...';
+  await runCalibration();
+});
+toggleDotBtn.addEventListener('click', () => {
+  showGazeDot = !showGazeDot;
+  gazeDot.classList.toggle('on', showGazeDot);
+  toggleDotBtn.textContent = showGazeDot ? '시선점 ✓' : '시선점';
+});
+togglePreviewBtn.addEventListener('click', () => preview.classList.toggle('on'));
+toggleLogBtn.addEventListener('click', () => logEl.classList.toggle('show'));
+resetBtn.addEventListener('click', () => {
+  gazeTimes = { TL: 0, TR: 0, BL: 0, BR: 0 };
+  for (const k of Object.keys(quads)) {
+    quads[k].querySelector('.gaze-time').textContent = '0.0s';
+  }
+});
+
+log('초기화 완료. 시작 버튼을 눌러주세요.');
 </script>
 
 </body>
