@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>모바일 시선 추적 v3</title>
+<title>손 추적 데모</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
@@ -13,18 +13,55 @@
   }
   #app { position: fixed; inset: 0; display: flex; flex-direction: column; }
 
-  /* 4분면 */
-  #quadrants {
+  /* 탭 바 */
+  #tabs {
+    display: flex;
+    background: #0a0a0a;
+    border-bottom: 1px solid #2a2a2a;
+    flex-shrink: 0;
+  }
+  .tab {
     flex: 1;
+    padding: 14px 8px;
+    text-align: center;
+    font-size: 13px;
+    font-weight: 500;
+    color: #888;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .tab.active {
+    color: #fff;
+    border-bottom-color: #2563eb;
+    background: #1a1a1a;
+  }
+
+  /* 메인 영역 */
+  #stage {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+  .mode {
+    position: absolute;
+    inset: 0;
+    display: none;
+  }
+  .mode.active { display: block; }
+
+  /* === 포인터 모드 === */
+  #pointer-mode {
     display: grid;
     grid-template-columns: 1fr 1fr;
     grid-template-rows: 1fr 1fr;
-    gap: 2px; background: #2a2a2a;
+    gap: 2px;
+    background: #2a2a2a;
   }
   .quad {
     background: #1a1a1a;
     display: flex; align-items: center; justify-content: center;
-    font-size: 48px; font-weight: 700; color: #444;
+    font-size: 56px; font-weight: 700; color: #444;
     transition: background 0.15s, color 0.15s;
     position: relative;
   }
@@ -34,61 +71,141 @@
     font-size: 11px; font-weight: 500; color: #666; letter-spacing: 1px;
   }
   .quad.active .quad-label { color: rgba(255,255,255,0.7); }
-  .gaze-time {
-    position: absolute; bottom: 12px; right: 12px;
-    font-size: 14px; color: #666; font-variant-numeric: tabular-nums;
-  }
-  .quad.active .gaze-time { color: rgba(255,255,255,0.8); }
-
-  /* 시선 점 (디버그용) */
-  #gaze-dot {
-    position: fixed;
-    width: 24px; height: 24px;
-    background: rgba(74,222,128,0.5);
-    border: 2px solid #4ade80;
+  #finger-cursor {
+    position: absolute;
+    width: 32px; height: 32px;
+    background: radial-gradient(circle, #4ade80 30%, rgba(74,222,128,0.4) 70%, transparent);
     border-radius: 50%;
     pointer-events: none;
-    z-index: 50;
     transform: translate(-50%,-50%);
+    z-index: 30;
     display: none;
-    transition: top 0.06s linear, left 0.06s linear;
+    transition: top 0.05s linear, left 0.05s linear;
   }
-  #gaze-dot.on { display: block; }
+  #finger-cursor.on { display: block; }
+  #finger-cursor.pinch {
+    background: radial-gradient(circle, #ef4444 30%, rgba(239,68,68,0.4) 70%, transparent);
+    transform: translate(-50%,-50%) scale(1.4);
+  }
+
+  /* === 제스처 모드 === */
+  #gesture-mode {
+    background: #0a0a0a;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  #gesture-display {
+    text-align: center;
+  }
+  #gesture-emoji {
+    font-size: 200px;
+    line-height: 1;
+    margin-bottom: 24px;
+    filter: grayscale(0.3);
+    transition: transform 0.2s;
+  }
+  #gesture-emoji.active { transform: scale(1.1); filter: grayscale(0); }
+  #gesture-name {
+    font-size: 32px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: #fff;
+  }
+  #gesture-name.none { color: #444; }
+  #gesture-confidence {
+    font-size: 14px;
+    color: #888;
+    font-variant-numeric: tabular-nums;
+  }
+  #gesture-history {
+    margin-top: 32px;
+    display: flex;
+    gap: 12px;
+    font-size: 36px;
+    opacity: 0.4;
+  }
+  .hist-item {
+    width: 50px; height: 50px;
+    display: flex; align-items: center; justify-content: center;
+    background: #1a1a1a;
+    border-radius: 8px;
+  }
+
+  /* === 드로잉 모드 === */
+  #drawing-mode {
+    background: #0a0a0a;
+  }
+  #draw-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+  #draw-info {
+    position: absolute;
+    top: 12px; left: 12px;
+    background: rgba(0,0,0,0.7);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #ccc;
+    z-index: 20;
+    line-height: 1.5;
+  }
+  #draw-info strong { color: #4ade80; }
+  #color-picker {
+    position: absolute;
+    top: 12px; right: 12px;
+    display: flex;
+    gap: 6px;
+    z-index: 20;
+  }
+  .color-btn {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+  }
+  .color-btn.active { border-color: #fff; }
 
   /* 패널 */
   #panel {
     background: #0a0a0a;
     border-top: 1px solid #2a2a2a;
-    padding: 12px;
-    display: flex; gap: 8px; align-items: center;
-    flex-wrap: wrap;
+    padding: 10px 12px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-shrink: 0;
   }
   #status {
-    flex: 1 1 100%; font-size: 12px; color: #888; line-height: 1.4;
-    margin-bottom: 4px;
+    flex: 1; font-size: 12px; color: #888; line-height: 1.4;
   }
   #status.ok { color: #4ade80; }
   #status.err { color: #ef4444; }
   button {
-    padding: 10px 14px;
+    padding: 8px 12px;
     background: #2563eb; color: white;
-    border: none; border-radius: 8px;
-    font-size: 13px; font-weight: 500; cursor: pointer;
+    border: none; border-radius: 6px;
+    font-size: 12px; font-weight: 500; cursor: pointer;
   }
   button:disabled { background: #374151; opacity: 0.6; }
   button.secondary { background: #374151; }
-  button.success { background: #16a34a; }
 
   /* 카메라 프리뷰 */
   #preview {
     position: fixed;
-    top: 12px; right: 12px;
-    width: 90px; height: 120px;
+    bottom: 70px; right: 12px;
+    width: 100px; height: 140px;
     border-radius: 8px;
     overflow: hidden;
     border: 1px solid #2a2a2a;
     background: #000;
-    z-index: 100; display: none;
+    z-index: 100;
+    display: none;
   }
   #preview.on { display: block; }
   #video, #overlay {
@@ -101,7 +218,8 @@
     position: fixed; inset: 0;
     background: rgba(10,10,10,0.98);
     z-index: 1000;
-    display: flex; align-items: center; justify-content: center;
+    display: flex;
+    align-items: center; justify-content: center;
     padding: 24px;
   }
   .intro-card { max-width: 360px; text-align: center; }
@@ -113,51 +231,11 @@
   }
   .intro-card button { width: 100%; padding: 14px; font-size: 15px; }
 
-  /* 캘리브레이션 오버레이 */
-  #cal-overlay {
-    position: fixed; inset: 0;
-    background: #000;
-    z-index: 800;
-    display: none;
-  }
-  #cal-overlay.on { display: block; }
-  #cal-dot {
-    position: absolute;
-    width: 40px; height: 40px;
-    border-radius: 50%;
-    background: radial-gradient(circle, #ef4444 30%, rgba(239,68,68,0.3) 70%, transparent);
-    transform: translate(-50%,-50%);
-    transition: top 0.6s ease, left 0.6s ease;
-  }
-  #cal-dot.collecting {
-    animation: pulse 0.6s ease-in-out infinite alternate;
-  }
-  @keyframes pulse {
-    from { transform: translate(-50%,-50%) scale(1); }
-    to { transform: translate(-50%,-50%) scale(1.4); }
-  }
-  #cal-progress {
-    position: absolute;
-    bottom: 60px; left: 50%;
-    transform: translateX(-50%);
-    color: #fff; font-size: 16px; text-align: center;
-    width: 90%;
-  }
-  #cal-progress .ring {
-    width: 60px; height: 60px;
-    margin: 12px auto;
-    border: 4px solid #2a2a2a;
-    border-top-color: #4ade80;
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
   /* 로그 */
   #log {
     position: fixed;
-    left: 12px; right: 12px; bottom: 80px;
-    max-height: 200px; overflow-y: auto;
+    left: 12px; right: 12px; bottom: 70px;
+    max-height: 180px; overflow-y: auto;
     background: rgba(0,0,0,0.9);
     border: 1px solid #2a2a2a;
     border-radius: 8px;
@@ -176,36 +254,57 @@
 <body>
 
 <div id="app">
-  <div id="quadrants">
-    <div class="quad" data-q="TL">
-      <span class="quad-label">좌상</span><span>↖</span>
-      <span class="gaze-time">0.0s</span>
+  <div id="tabs">
+    <div class="tab active" data-mode="pointer">👆 포인터</div>
+    <div class="tab" data-mode="gesture">✋ 제스처</div>
+    <div class="tab" data-mode="drawing">🎨 드로잉</div>
+  </div>
+
+  <div id="stage">
+    <!-- 포인터 모드 -->
+    <div id="pointer-mode" class="mode active">
+      <div class="quad" data-q="TL"><span class="quad-label">좌상</span>↖</div>
+      <div class="quad" data-q="TR"><span class="quad-label">우상</span>↗</div>
+      <div class="quad" data-q="BL"><span class="quad-label">좌하</span>↙</div>
+      <div class="quad" data-q="BR"><span class="quad-label">우하</span>↘</div>
+      <div id="finger-cursor"></div>
     </div>
-    <div class="quad" data-q="TR">
-      <span class="quad-label">우상</span><span>↗</span>
-      <span class="gaze-time">0.0s</span>
+
+    <!-- 제스처 모드 -->
+    <div id="gesture-mode" class="mode">
+      <div id="gesture-display">
+        <div id="gesture-emoji">🖐️</div>
+        <div id="gesture-name" class="none">손을 보여주세요</div>
+        <div id="gesture-confidence">대기 중</div>
+      </div>
+      <div id="gesture-history"></div>
     </div>
-    <div class="quad" data-q="BL">
-      <span class="quad-label">좌하</span><span>↙</span>
-      <span class="gaze-time">0.0s</span>
-    </div>
-    <div class="quad" data-q="BR">
-      <span class="quad-label">우하</span><span>↘</span>
-      <span class="gaze-time">0.0s</span>
+
+    <!-- 드로잉 모드 -->
+    <div id="drawing-mode" class="mode">
+      <canvas id="draw-canvas"></canvas>
+      <div id="draw-info">
+        <strong>검지만 펴기</strong>: 그리기<br>
+        <strong>주먹</strong>: 멈춤<br>
+        <strong>보자기</strong>: 전체 지우기
+      </div>
+      <div id="color-picker">
+        <div class="color-btn active" data-color="#4ade80" style="background:#4ade80"></div>
+        <div class="color-btn" data-color="#3b82f6" style="background:#3b82f6"></div>
+        <div class="color-btn" data-color="#ef4444" style="background:#ef4444"></div>
+        <div class="color-btn" data-color="#f59e0b" style="background:#f59e0b"></div>
+        <div class="color-btn" data-color="#ffffff" style="background:#ffffff"></div>
+      </div>
     </div>
   </div>
 
   <div id="panel">
     <div id="status">대기 중</div>
-    <button id="recal-btn" class="secondary" disabled>재캘리브레이션</button>
-    <button id="toggle-dot" class="secondary">시선점</button>
     <button id="toggle-preview" class="secondary">카메라</button>
     <button id="toggle-log" class="secondary">로그</button>
-    <button id="reset-btn" class="secondary">리셋</button>
+    <button id="clear-btn" class="secondary">지우기</button>
   </div>
 </div>
-
-<div id="gaze-dot"></div>
 
 <div id="preview">
   <video id="video" autoplay playsinline muted></video>
@@ -214,24 +313,14 @@
 
 <div id="intro">
   <div class="intro-card">
-    <h1>👁️ 시선 추적 v3</h1>
-    <p>캘리브레이션으로 개인별 보정을 합니다.<br>5개 점을 차례로 응시하기만 하면 돼요.</p>
+    <h1>✋ 손 추적 데모</h1>
+    <p>한 손을 화면에 보이면<br>3가지 모드로 인식합니다.</p>
     <ul>
-      <li>폰을 거치하거나 양손으로 안정적으로</li>
-      <li>밝은 조명, 정면 응시</li>
-      <li>캘리브레이션 중에는 머리 고정</li>
-      <li>점이 보이면 그 점을 따라 시선만 이동</li>
+      <li><strong>포인터</strong>: 검지 끝으로 화면 가리키기 (엄지+검지 핀치 = 클릭)</li>
+      <li><strong>제스처</strong>: 주먹/보/가위/엄지척/V/OK 인식</li>
+      <li><strong>드로잉</strong>: 검지로 허공에 그림 그리기</li>
     </ul>
-    <button id="start-btn">시작하기</button>
-  </div>
-</div>
-
-<div id="cal-overlay">
-  <div id="cal-dot"></div>
-  <div id="cal-progress">
-    <div id="cal-text">점을 응시하세요</div>
-    <div class="ring"></div>
-    <div id="cal-counter" style="font-size:13px;color:#888;margin-top:8px;">1 / 5</div>
+    <button id="start-btn">카메라 시작</button>
   </div>
 </div>
 
@@ -249,37 +338,37 @@ function log(msg, type = 'info') {
   logEl.scrollTop = logEl.scrollHeight;
   console.log(`[${type}]`, msg);
 }
-
 window.addEventListener('error', (e) => {
-  log(`ERROR: ${e.message} @ ${e.filename}:${e.lineno}`, 'err');
+  log(`ERROR: ${e.message}`, 'err');
   logEl.classList.add('show');
 });
 window.addEventListener('unhandledrejection', (e) => {
-  log(`PROMISE REJECT: ${e.reason}`, 'err');
+  log(`REJECT: ${e.reason}`, 'err');
   logEl.classList.add('show');
 });
 
-log('페이지 로드 완료');
-log(`Protocol: ${location.protocol}`);
-
 // ========== DOM ==========
 const startBtn = document.getElementById('start-btn');
-const recalBtn = document.getElementById('recal-btn');
-const resetBtn = document.getElementById('reset-btn');
 const togglePreviewBtn = document.getElementById('toggle-preview');
 const toggleLogBtn = document.getElementById('toggle-log');
-const toggleDotBtn = document.getElementById('toggle-dot');
+const clearBtn = document.getElementById('clear-btn');
 const statusEl = document.getElementById('status');
 const intro = document.getElementById('intro');
 const preview = document.getElementById('preview');
 const video = document.getElementById('video');
 const overlay = document.getElementById('overlay');
 const octx = overlay.getContext('2d');
-const gazeDot = document.getElementById('gaze-dot');
-const calOverlay = document.getElementById('cal-overlay');
-const calDot = document.getElementById('cal-dot');
-const calText = document.getElementById('cal-text');
-const calCounter = document.getElementById('cal-counter');
+const stage = document.getElementById('stage');
+const fingerCursor = document.getElementById('finger-cursor');
+const drawCanvas = document.getElementById('draw-canvas');
+const dctx = drawCanvas.getContext('2d');
+const gestureEmoji = document.getElementById('gesture-emoji');
+const gestureName = document.getElementById('gesture-name');
+const gestureConfidence = document.getElementById('gesture-confidence');
+const gestureHistory = document.getElementById('gesture-history');
+
+const tabs = document.querySelectorAll('.tab');
+const modes = document.querySelectorAll('.mode');
 
 const quads = {
   TL: document.querySelector('[data-q="TL"]'),
@@ -289,261 +378,65 @@ const quads = {
 };
 
 // ========== 상태 ==========
-let faceLandmarker = null;
+let handLandmarker = null;
 let running = false;
 let lastVideoTime = -1;
+let currentMode = 'pointer';
 let currentQuad = null;
-let gazeTimes = { TL: 0, TR: 0, BL: 0, BR: 0 };
-let lastTickTime = performance.now();
-let showGazeDot = false;
+let drawColor = '#4ade80';
+let lastDrawPoint = null;
+let gestureHistoryArr = [];
+let lastGesture = null;
+let gestureStableFrames = 0;
 
-// 캘리브레이션 매핑 (raw → screen): screen = A * raw + B
-// 초기값은 항등 매핑
-let calibration = {
-  done: false,
-  // 매핑 계수 (X, Y 각각)
-  ax: 1, bx: 0,
-  ay: 1, by: 0,
-};
-
-// 스무딩
-const smoothBuffer = { x: [], y: [], size: 8 };
+// 스무딩 (포인터/드로잉용)
+const smoothBuf = { x: [], y: [], size: 4 };
 function smooth(buf, val) {
   buf.push(val);
-  if (buf.length > smoothBuffer.size) buf.shift();
+  if (buf.length > smoothBuf.size) buf.shift();
   return buf.reduce((a, b) => a + b, 0) / buf.length;
 }
 
-// ========== 시선 raw 값 계산 ==========
-function getRawGaze(landmarks, matrix) {
-  const lIris = landmarks[468];
-  const rIris = landmarks[473];
-  const lEyeOuter = landmarks[33];
-  const lEyeInner = landmarks[133];
-  const rEyeInner = landmarks[362];
-  const rEyeOuter = landmarks[263];
-  const lEyeTop = landmarks[159];
-  const lEyeBottom = landmarks[145];
-  const rEyeTop = landmarks[386];
-  const rEyeBottom = landmarks[374];
-
-  const lRelX = (lIris.x - lEyeOuter.x) / (lEyeInner.x - lEyeOuter.x);
-  const rRelX = (rIris.x - rEyeInner.x) / (rEyeOuter.x - rEyeInner.x);
-  const eyeX = (lRelX + rRelX) / 2;
-
-  const lRelY = (lIris.y - lEyeTop.y) / (lEyeBottom.y - lEyeTop.y);
-  const rRelY = (rIris.y - rEyeTop.y) / (rEyeBottom.y - rEyeTop.y);
-  const eyeY = (lRelY + rRelY) / 2;
-
-  let headYaw = 0, headPitch = 0;
-  if (matrix && matrix.data) {
-    const m = matrix.data;
-    headYaw = Math.atan2(m[8], m[10]);
-    headPitch = Math.atan2(-m[9], Math.sqrt(m[1]*m[1] + m[5]*m[5]));
-  }
-
-  // raw 값: 눈동자 위치와 머리 회전 결합
-  // 캘리브레이션이 가중치를 학습하므로 여기선 단순 합성
-  const rawX = eyeX + headYaw;
-  const rawY = eyeY + headPitch;
-
-  return { rawX, rawY };
+// ========== 캔버스 리사이즈 ==========
+function resizeDrawCanvas() {
+  const rect = drawCanvas.getBoundingClientRect();
+  drawCanvas.width = rect.width;
+  drawCanvas.height = rect.height;
 }
-
-// ========== 캘리브레이션 ==========
-const CAL_POINTS = [
-  { name: '좌상', xPct: 12, yPct: 12 },
-  { name: '우상', xPct: 88, yPct: 12 },
-  { name: '중앙', xPct: 50, yPct: 50 },
-  { name: '좌하', xPct: 12, yPct: 88 },
-  { name: '우하', xPct: 88, yPct: 88 },
-];
-
-// 캘리브레이션 데이터: 각 점에서 수집한 [rawX, rawY] 평균
-let calSamples = [];
-let calCollecting = false;
-let calCurrentRaw = { sx: 0, sy: 0, n: 0 };
-
-async function runCalibration() {
-  log('=== 캘리브레이션 시작 ===');
-  calOverlay.classList.add('on');
-  calSamples = [];
-
-  // 점 표시 → 0.8초 대기(시선 이동) → 1.5초 수집 → 다음 점
-  for (let i = 0; i < CAL_POINTS.length; i++) {
-    const pt = CAL_POINTS[i];
-    calDot.style.left = pt.xPct + '%';
-    calDot.style.top = pt.yPct + '%';
-    calText.textContent = `"${pt.name}" 점을 응시하세요`;
-    calCounter.textContent = `${i + 1} / ${CAL_POINTS.length}`;
-    calDot.classList.remove('collecting');
-
-    // 시선 이동 시간
-    await sleep(800);
-
-    // 수집 시작
-    calDot.classList.add('collecting');
-    calCurrentRaw = { sx: 0, sy: 0, n: 0 };
-    calCollecting = true;
-    await sleep(1500);
-    calCollecting = false;
-
-    if (calCurrentRaw.n < 10) {
-      log(`점 ${pt.name}: 샘플 부족 (${calCurrentRaw.n}). 얼굴이 안 잡힌 듯`, 'warn');
-      // 실패해도 계속 진행 (마지막에 검증)
-    }
-    const avgX = calCurrentRaw.sx / Math.max(1, calCurrentRaw.n);
-    const avgY = calCurrentRaw.sy / Math.max(1, calCurrentRaw.n);
-    calSamples.push({
-      rawX: avgX, rawY: avgY,
-      screenX: pt.xPct / 100,
-      screenY: pt.yPct / 100,
-      samples: calCurrentRaw.n,
-      name: pt.name,
-    });
-    log(`점 ${pt.name}: raw=(${avgX.toFixed(3)}, ${avgY.toFixed(3)}), n=${calCurrentRaw.n}`);
-  }
-
-  // 매핑 계산 (선형회귀)
-  const ok = computeCalibration();
-  calOverlay.classList.remove('on');
-
-  if (ok) {
-    calibration.done = true;
-    log('=== 캘리브레이션 완료 ===');
-    log(`X: screen = ${calibration.ax.toFixed(3)} * raw + ${calibration.bx.toFixed(3)}`);
-    log(`Y: screen = ${calibration.ay.toFixed(3)} * raw + ${calibration.by.toFixed(3)}`);
-    statusEl.textContent = '추적 중 (캘리브레이션 완료)';
-    statusEl.className = 'ok';
-    recalBtn.disabled = false;
-  } else {
-    log('캘리브레이션 실패 — 다시 시도하세요', 'err');
-    statusEl.textContent = '캘리브레이션 실패';
-    statusEl.className = 'err';
-    recalBtn.disabled = false;
-    logEl.classList.add('show');
-  }
-}
-
-// 최소제곱법으로 1차 매핑 계수 구하기
-// screen_x = ax * rawX + bx  (Y도 동일)
-function computeCalibration() {
-  if (calSamples.length < 3) return false;
-
-  // X 매핑
-  const xResult = linearRegression(
-    calSamples.map(s => s.rawX),
-    calSamples.map(s => s.screenX)
-  );
-  // Y 매핑
-  const yResult = linearRegression(
-    calSamples.map(s => s.rawY),
-    calSamples.map(s => s.screenY)
-  );
-
-  if (!xResult || !yResult) return false;
-
-  calibration.ax = xResult.a;
-  calibration.bx = xResult.b;
-  calibration.ay = yResult.a;
-  calibration.by = yResult.b;
-  return true;
-}
-
-function linearRegression(xs, ys) {
-  const n = xs.length;
-  if (n < 2) return null;
-  let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
-  for (let i = 0; i < n; i++) {
-    sumX += xs[i];
-    sumY += ys[i];
-    sumXY += xs[i] * ys[i];
-    sumXX += xs[i] * xs[i];
-  }
-  const meanX = sumX / n;
-  const meanY = sumY / n;
-  const denom = sumXX - n * meanX * meanX;
-  if (Math.abs(denom) < 1e-9) return null; // 모든 raw가 같으면 매핑 불가
-  const a = (sumXY - n * meanX * meanY) / denom;
-  const b = meanY - a * meanX;
-  return { a, b };
-}
-
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-// ========== 시선 → 화면 좌표 ==========
-function rawToScreen(rawX, rawY) {
-  let sx = calibration.ax * rawX + calibration.bx;
-  let sy = calibration.ay * rawY + calibration.by;
-  return {
-    x: Math.max(0, Math.min(1, sx)),
-    y: Math.max(0, Math.min(1, sy)),
-  };
-}
-
-function quadrantOf(x, y) {
-  const top = y < 0.5;
-  const left = x < 0.5;
-  if (top && left) return 'TL';
-  if (top && !left) return 'TR';
-  if (!top && left) return 'BL';
-  return 'BR';
-}
-
-function updateQuadUI(q) {
-  for (const k of Object.keys(quads)) {
-    quads[k].classList.toggle('active', k === q);
-  }
-}
-
-function updateGazeTime(q, deltaSec) {
-  gazeTimes[q] += deltaSec;
-  quads[q].querySelector('.gaze-time').textContent = gazeTimes[q].toFixed(1) + 's';
-}
-
-function drawOverlay(landmarks) {
-  octx.clearRect(0, 0, overlay.width, overlay.height);
-  if (!landmarks) return;
-  octx.fillStyle = '#4ade80';
-  for (const idx of [468, 473]) {
-    const p = landmarks[idx];
-    octx.beginPath();
-    octx.arc(p.x * overlay.width, p.y * overlay.height, 4, 0, Math.PI * 2);
-    octx.fill();
-  }
-}
+window.addEventListener('resize', resizeDrawCanvas);
 
 // ========== MediaPipe 로딩 ==========
 async function loadMediaPipe() {
-  log('MediaPipe 로딩...');
+  log('MediaPipe 모듈 로딩...');
   const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/vision_bundle.mjs');
-  const { FilesetResolver, FaceLandmarker } = vision;
+  const { FilesetResolver, HandLandmarker } = vision;
+
+  log('WASM fileset 로딩...');
   const filesetResolver = await FilesetResolver.forVisionTasks(
     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/wasm"
   );
-  log('모델 다운로드 중...');
+
+  log('Hand 모델 다운로드...');
   let landmarker;
   try {
-    landmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+    landmarker = await HandLandmarker.createFromOptions(filesetResolver, {
       baseOptions: {
-        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
         delegate: "GPU"
       },
-      outputFacialTransformationMatrixes: true,
       runningMode: "VIDEO",
-      numFaces: 1
+      numHands: 1,
     });
     log('GPU 모드');
   } catch (e) {
     log(`GPU 실패, CPU로: ${e.message}`, 'warn');
-    landmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+    landmarker = await HandLandmarker.createFromOptions(filesetResolver, {
       baseOptions: {
-        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
         delegate: "CPU"
       },
-      outputFacialTransformationMatrixes: true,
       runningMode: "VIDEO",
-      numFaces: 1
+      numHands: 1,
     });
     log('CPU 모드');
   }
@@ -570,20 +463,16 @@ async function startApp() {
     overlay.height = video.videoHeight;
     log(`비디오: ${video.videoWidth}x${video.videoHeight}`);
 
-    if (!faceLandmarker) {
-      faceLandmarker = await loadMediaPipe();
+    if (!handLandmarker) {
+      handLandmarker = await loadMediaPipe();
     }
 
     intro.style.display = 'none';
+    resizeDrawCanvas();
     running = true;
-    statusEl.textContent = '캘리브레이션 진행 중...';
-    statusEl.className = '';
-    lastTickTime = performance.now();
+    statusEl.textContent = '추적 중 — 손을 카메라에 보여주세요';
+    statusEl.className = 'ok';
     requestAnimationFrame(loop);
-
-    // 짧게 대기 후 캘리브레이션 자동 시작
-    await sleep(500);
-    await runCalibration();
   } catch (e) {
     log(`시작 실패: ${e.message}`, 'err');
     statusEl.textContent = '실패: ' + e.message;
@@ -594,52 +483,249 @@ async function startApp() {
   }
 }
 
+// ========== 손 분석 ==========
+// MediaPipe Hand 랜드마크 인덱스
+// 0: WRIST
+// 1-4: THUMB (CMC, MCP, IP, TIP)
+// 5-8: INDEX
+// 9-12: MIDDLE
+// 13-16: RING
+// 17-20: PINKY
+
+// 손가락이 펴졌는지 판정
+// 손가락 TIP의 y가 PIP(중간 관절)보다 위(작은 y)에 있으면 펴진 것
+function getFingerStates(lm) {
+  // 검지/중지/약지/소지: TIP이 PIP보다 위에 있나
+  const index = lm[8].y < lm[6].y;
+  const middle = lm[12].y < lm[10].y;
+  const ring = lm[16].y < lm[14].y;
+  const pinky = lm[20].y < lm[18].y;
+
+  // 엄지는 좌우로 펴짐 — TIP과 IP의 x 거리
+  // 오른손인지 왼손인지에 따라 방향 다르지만, MCP에서 TIP까지 x 거리로 단순화
+  const thumb = Math.abs(lm[4].x - lm[2].x) > Math.abs(lm[3].x - lm[2].x);
+
+  return { thumb, index, middle, ring, pinky };
+}
+
+// 제스처 분류
+function classifyGesture(lm) {
+  const f = getFingerStates(lm);
+  const count = [f.thumb, f.index, f.middle, f.ring, f.pinky].filter(Boolean).length;
+
+  // 주먹: 다 접힘
+  if (count === 0) return { name: '주먹', emoji: '✊', conf: 0.9 };
+
+  // 검지만: 포인팅
+  if (f.index && !f.middle && !f.ring && !f.pinky && !f.thumb) {
+    return { name: '검지', emoji: '☝️', conf: 0.9 };
+  }
+
+  // V (검지+중지): 가위
+  if (f.index && f.middle && !f.ring && !f.pinky) {
+    return { name: '가위(V)', emoji: '✌️', conf: 0.9 };
+  }
+
+  // 엄지척: 엄지만
+  if (f.thumb && !f.index && !f.middle && !f.ring && !f.pinky) {
+    return { name: '엄지척', emoji: '👍', conf: 0.85 };
+  }
+
+  // OK: 엄지와 검지가 가까이 + 나머지 펴짐
+  const thumbTip = lm[4], indexTip = lm[8];
+  const pinchDist = Math.hypot(thumbTip.x - indexTip.x, thumbTip.y - indexTip.y);
+  if (pinchDist < 0.06 && f.middle && f.ring && f.pinky) {
+    return { name: 'OK', emoji: '👌', conf: 0.85 };
+  }
+
+  // 보: 다 펴짐
+  if (count >= 4) return { name: '보', emoji: '🖐️', conf: 0.9 };
+
+  return { name: '?', emoji: '🤔', conf: 0.3 };
+}
+
+// 핀치 감지 (엄지+검지 거리)
+function isPinching(lm) {
+  const d = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y);
+  return d < 0.05;
+}
+
+// ========== 오버레이 그리기 ==========
+function drawHandOverlay(lm) {
+  octx.clearRect(0, 0, overlay.width, overlay.height);
+  if (!lm) return;
+
+  // 연결선
+  const connections = [
+    [0,1],[1,2],[2,3],[3,4],          // 엄지
+    [0,5],[5,6],[6,7],[7,8],          // 검지
+    [5,9],[9,10],[10,11],[11,12],     // 중지
+    [9,13],[13,14],[14,15],[15,16],   // 약지
+    [13,17],[17,18],[18,19],[19,20],  // 소지
+    [0,17],                            // 손바닥
+  ];
+  octx.strokeStyle = '#4ade80';
+  octx.lineWidth = 2;
+  for (const [a, b] of connections) {
+    octx.beginPath();
+    octx.moveTo(lm[a].x * overlay.width, lm[a].y * overlay.height);
+    octx.lineTo(lm[b].x * overlay.width, lm[b].y * overlay.height);
+    octx.stroke();
+  }
+  // 점
+  octx.fillStyle = '#fff';
+  for (const p of lm) {
+    octx.beginPath();
+    octx.arc(p.x * overlay.width, p.y * overlay.height, 3, 0, Math.PI * 2);
+    octx.fill();
+  }
+}
+
+// ========== 모드별 처리 ==========
+function handlePointerMode(lm) {
+  const indexTip = lm[8];
+  // 좌우 반전 (거울)
+  const x = (1 - indexTip.x) * stage.clientWidth;
+  const y = indexTip.y * stage.clientHeight;
+  const sx = smooth(smoothBuf.x, x);
+  const sy = smooth(smoothBuf.y, y);
+
+  fingerCursor.classList.add('on');
+  fingerCursor.style.left = sx + 'px';
+  fingerCursor.style.top = sy + 'px';
+
+  const pinch = isPinching(lm);
+  fingerCursor.classList.toggle('pinch', pinch);
+
+  // 분면 판정
+  const rect = stage.getBoundingClientRect();
+  const normX = sx / rect.width;
+  const normY = sy / rect.height;
+  const q = (normY < 0.5 ? 'T' : 'B') + (normX < 0.5 ? 'L' : 'R');
+  if (q !== currentQuad) {
+    currentQuad = q;
+    for (const k of Object.keys(quads)) {
+      quads[k].classList.toggle('active', k === q);
+    }
+  }
+}
+
+function handleGestureMode(lm) {
+  const g = classifyGesture(lm);
+
+  // 안정화: 같은 제스처가 3프레임 연속이어야 확정
+  if (lastGesture && lastGesture.name === g.name) {
+    gestureStableFrames++;
+  } else {
+    gestureStableFrames = 0;
+  }
+  lastGesture = g;
+
+  if (gestureStableFrames >= 3) {
+    gestureEmoji.textContent = g.emoji;
+    gestureEmoji.classList.add('active');
+    gestureName.textContent = g.name;
+    gestureName.classList.remove('none');
+    gestureConfidence.textContent = `신뢰도 ${(g.conf * 100).toFixed(0)}%`;
+
+    // 히스토리 추가 (제스처 바뀔 때만)
+    if (gestureHistoryArr.length === 0 ||
+        gestureHistoryArr[gestureHistoryArr.length - 1].name !== g.name) {
+      gestureHistoryArr.push(g);
+      if (gestureHistoryArr.length > 5) gestureHistoryArr.shift();
+      renderGestureHistory();
+    }
+  }
+}
+
+function renderGestureHistory() {
+  gestureHistory.innerHTML = '';
+  for (const h of gestureHistoryArr) {
+    const div = document.createElement('div');
+    div.className = 'hist-item';
+    div.textContent = h.emoji;
+    gestureHistory.appendChild(div);
+  }
+}
+
+function handleDrawingMode(lm) {
+  const f = getFingerStates(lm);
+  const onlyIndex = f.index && !f.middle && !f.ring && !f.pinky;
+  const allOpen = f.index && f.middle && f.ring && f.pinky;
+  const fist = !f.index && !f.middle && !f.ring && !f.pinky;
+
+  // 보자기: 전체 지우기
+  if (allOpen) {
+    dctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+    lastDrawPoint = null;
+    return;
+  }
+
+  // 주먹: 멈춤
+  if (fist) {
+    lastDrawPoint = null;
+    return;
+  }
+
+  // 검지만: 그리기
+  if (onlyIndex) {
+    const indexTip = lm[8];
+    const x = (1 - indexTip.x) * drawCanvas.width;
+    const y = indexTip.y * drawCanvas.height;
+    const sx = smooth(smoothBuf.x, x);
+    const sy = smooth(smoothBuf.y, y);
+
+    if (lastDrawPoint) {
+      dctx.strokeStyle = drawColor;
+      dctx.lineWidth = 4;
+      dctx.lineCap = 'round';
+      dctx.lineJoin = 'round';
+      dctx.beginPath();
+      dctx.moveTo(lastDrawPoint.x, lastDrawPoint.y);
+      dctx.lineTo(sx, sy);
+      dctx.stroke();
+    }
+    lastDrawPoint = { x: sx, y: sy };
+  } else {
+    lastDrawPoint = null;
+  }
+}
+
+// 손 안 보일 때 상태 초기화
+function handleNoHand() {
+  if (currentMode === 'pointer') {
+    fingerCursor.classList.remove('on', 'pinch');
+    for (const k of Object.keys(quads)) quads[k].classList.remove('active');
+    currentQuad = null;
+  } else if (currentMode === 'gesture') {
+    gestureEmoji.classList.remove('active');
+    gestureName.classList.add('none');
+    gestureName.textContent = '손을 보여주세요';
+    gestureConfidence.textContent = '대기 중';
+    gestureStableFrames = 0;
+  } else if (currentMode === 'drawing') {
+    lastDrawPoint = null;
+  }
+}
+
 // ========== 메인 루프 ==========
 function loop() {
   if (!running) return;
-  const now = performance.now();
-  const deltaSec = (now - lastTickTime) / 1000;
-  lastTickTime = now;
 
   if (video.currentTime !== lastVideoTime) {
     lastVideoTime = video.currentTime;
     try {
-      const result = faceLandmarker.detectForVideo(video, now);
-      if (result.faceLandmarks && result.faceLandmarks.length > 0) {
-        const landmarks = result.faceLandmarks[0];
-        const matrix = result.facialTransformationMatrixes
-          ? result.facialTransformationMatrixes[0]
-          : null;
-        const { rawX, rawY } = getRawGaze(landmarks, matrix);
+      const result = handLandmarker.detectForVideo(video, performance.now());
+      if (result.landmarks && result.landmarks.length > 0) {
+        const lm = result.landmarks[0];
+        drawHandOverlay(lm);
 
-        // 캘리브레이션 수집 중이면 raw 값 누적
-        if (calCollecting) {
-          calCurrentRaw.sx += rawX;
-          calCurrentRaw.sy += rawY;
-          calCurrentRaw.n++;
-        }
-
-        // 캘리브레이션 완료 후에만 분면 판정
-        if (calibration.done) {
-          const screen = rawToScreen(rawX, rawY);
-          const sx = smooth(smoothBuffer.x, screen.x);
-          const sy = smooth(smoothBuffer.y, screen.y);
-
-          // 시선 점 표시
-          if (showGazeDot) {
-            gazeDot.style.left = (sx * window.innerWidth) + 'px';
-            gazeDot.style.top = (sy * window.innerHeight) + 'px';
-          }
-
-          const q = quadrantOf(sx, sy);
-          if (q !== currentQuad) {
-            currentQuad = q;
-            updateQuadUI(q);
-          }
-          updateGazeTime(q, deltaSec);
-        }
-
-        drawOverlay(landmarks);
+        if (currentMode === 'pointer') handlePointerMode(lm);
+        else if (currentMode === 'gesture') handleGestureMode(lm);
+        else if (currentMode === 'drawing') handleDrawingMode(lm);
+      } else {
+        octx.clearRect(0, 0, overlay.width, overlay.height);
+        handleNoHand();
       }
     } catch (e) {
       log(`detect 오류: ${e.message}`, 'err');
@@ -648,25 +734,40 @@ function loop() {
   requestAnimationFrame(loop);
 }
 
-// ========== UI 핸들러 ==========
+// ========== 탭 전환 ==========
+tabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    const mode = tab.dataset.mode;
+    tabs.forEach(t => t.classList.toggle('active', t === tab));
+    modes.forEach(m => m.classList.toggle('active', m.id === `${mode}-mode`));
+    currentMode = mode;
+    smoothBuf.x = [];
+    smoothBuf.y = [];
+    handleNoHand();
+    if (mode === 'drawing') resizeDrawCanvas();
+    log(`모드 전환: ${mode}`);
+  });
+});
+
+// ========== 색상 선택 ==========
+document.querySelectorAll('.color-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    drawColor = btn.dataset.color;
+  });
+});
+
+// ========== 버튼 ==========
 startBtn.addEventListener('click', startApp);
-recalBtn.addEventListener('click', async () => {
-  recalBtn.disabled = true;
-  calibration.done = false;
-  statusEl.textContent = '재캘리브레이션 중...';
-  await runCalibration();
-});
-toggleDotBtn.addEventListener('click', () => {
-  showGazeDot = !showGazeDot;
-  gazeDot.classList.toggle('on', showGazeDot);
-  toggleDotBtn.textContent = showGazeDot ? '시선점 ✓' : '시선점';
-});
 togglePreviewBtn.addEventListener('click', () => preview.classList.toggle('on'));
 toggleLogBtn.addEventListener('click', () => logEl.classList.toggle('show'));
-resetBtn.addEventListener('click', () => {
-  gazeTimes = { TL: 0, TR: 0, BL: 0, BR: 0 };
-  for (const k of Object.keys(quads)) {
-    quads[k].querySelector('.gaze-time').textContent = '0.0s';
+clearBtn.addEventListener('click', () => {
+  if (currentMode === 'drawing') {
+    dctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+  } else if (currentMode === 'gesture') {
+    gestureHistoryArr = [];
+    renderGestureHistory();
   }
 });
 
