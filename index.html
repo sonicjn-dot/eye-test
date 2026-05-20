@@ -20,8 +20,6 @@
     display: flex;
     flex-direction: column;
   }
-
-  /* 4분면 */
   #quadrants {
     flex: 1;
     display: grid;
@@ -41,31 +39,18 @@
     transition: background 0.15s, color 0.15s;
     position: relative;
   }
-  .quad.active {
-    background: #2563eb;
-    color: #fff;
-  }
+  .quad.active { background: #2563eb; color: #fff; }
   .quad-label {
-    position: absolute;
-    top: 12px;
-    left: 12px;
-    font-size: 11px;
-    font-weight: 500;
-    color: #666;
-    letter-spacing: 1px;
+    position: absolute; top: 12px; left: 12px;
+    font-size: 11px; font-weight: 500; color: #666; letter-spacing: 1px;
   }
   .quad.active .quad-label { color: rgba(255,255,255,0.7); }
   .gaze-time {
-    position: absolute;
-    bottom: 12px;
-    right: 12px;
-    font-size: 14px;
-    color: #666;
-    font-variant-numeric: tabular-nums;
+    position: absolute; bottom: 12px; right: 12px;
+    font-size: 14px; color: #666; font-variant-numeric: tabular-nums;
   }
   .quad.active .gaze-time { color: rgba(255,255,255,0.8); }
 
-  /* 컨트롤 패널 */
   #panel {
     background: #0a0a0a;
     border-top: 1px solid #2a2a2a;
@@ -75,10 +60,7 @@
     align-items: center;
   }
   #status {
-    flex: 1;
-    font-size: 12px;
-    color: #888;
-    line-height: 1.4;
+    flex: 1; font-size: 12px; color: #888; line-height: 1.4;
   }
   #status.ok { color: #4ade80; }
   #status.err { color: #ef4444; }
@@ -92,16 +74,13 @@
     font-weight: 500;
     cursor: pointer;
   }
-  button:disabled { background: #374151; }
+  button:disabled { background: #374151; opacity: 0.6; }
   button.secondary { background: #374151; }
 
-  /* 미리보기 영상 (작은 PiP) */
   #preview {
     position: fixed;
-    top: 12px;
-    right: 12px;
-    width: 100px;
-    height: 130px;
+    top: 12px; right: 12px;
+    width: 100px; height: 130px;
     border-radius: 8px;
     overflow: hidden;
     border: 1px solid #2a2a2a;
@@ -111,44 +90,51 @@
   }
   #preview.on { display: block; }
   #video, #overlay {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    transform: scaleX(-1); /* 거울 모드 */
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    transform: scaleX(-1);
   }
 
-  /* 인트로 */
   #intro {
-    position: fixed;
-    inset: 0;
+    position: fixed; inset: 0;
     background: rgba(10,10,10,0.98);
     z-index: 1000;
     display: flex;
-    align-items: center;
-    justify-content: center;
+    align-items: center; justify-content: center;
     padding: 24px;
   }
-  .intro-card {
-    max-width: 360px;
-    text-align: center;
-  }
+  .intro-card { max-width: 360px; text-align: center; }
   .intro-card h1 { font-size: 22px; margin-bottom: 16px; }
   .intro-card p {
-    color: #aaa;
-    font-size: 14px;
-    line-height: 1.6;
-    margin-bottom: 20px;
+    color: #aaa; font-size: 14px; line-height: 1.6; margin-bottom: 20px;
   }
   .intro-card ul {
-    text-align: left;
-    color: #888;
-    font-size: 13px;
-    line-height: 1.8;
-    margin-bottom: 24px;
-    padding-left: 20px;
+    text-align: left; color: #888; font-size: 13px;
+    line-height: 1.8; margin-bottom: 20px; padding-left: 20px;
   }
   .intro-card button { width: 100%; padding: 14px; font-size: 15px; }
+
+  /* 에러/로그 출력 박스 */
+  #log {
+    position: fixed;
+    left: 12px; right: 12px; bottom: 80px;
+    max-height: 200px;
+    overflow-y: auto;
+    background: rgba(0,0,0,0.85);
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    padding: 10px;
+    font-family: 'SF Mono', Menlo, monospace;
+    font-size: 11px;
+    color: #4ade80;
+    z-index: 2000;
+    display: none;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  #log.show { display: block; }
+  #log .err { color: #ef4444; }
+  #log .warn { color: #f59e0b; }
 </style>
 </head>
 <body>
@@ -156,23 +142,19 @@
 <div id="app">
   <div id="quadrants">
     <div class="quad" data-q="TL">
-      <span class="quad-label">좌상</span>
-      <span class="big">↖</span>
+      <span class="quad-label">좌상</span><span>↖</span>
       <span class="gaze-time">0.0s</span>
     </div>
     <div class="quad" data-q="TR">
-      <span class="quad-label">우상</span>
-      <span class="big">↗</span>
+      <span class="quad-label">우상</span><span>↗</span>
       <span class="gaze-time">0.0s</span>
     </div>
     <div class="quad" data-q="BL">
-      <span class="quad-label">좌하</span>
-      <span class="big">↙</span>
+      <span class="quad-label">좌하</span><span>↙</span>
       <span class="gaze-time">0.0s</span>
     </div>
     <div class="quad" data-q="BR">
-      <span class="quad-label">우하</span>
-      <span class="big">↘</span>
+      <span class="quad-label">우하</span><span>↘</span>
       <span class="gaze-time">0.0s</span>
     </div>
   </div>
@@ -180,6 +162,7 @@
   <div id="panel">
     <div id="status">대기 중</div>
     <button id="toggle-preview" class="secondary">카메라</button>
+    <button id="toggle-log" class="secondary">로그</button>
     <button id="reset-btn" class="secondary">리셋</button>
   </div>
 </div>
@@ -197,27 +180,63 @@
       <li>폰을 정면에서 30~40cm</li>
       <li>밝은 조명, 안경 반사 주의</li>
       <li>머리는 가급적 고정</li>
-      <li>고개 돌리기 + 눈동자 움직임 둘 다 인식</li>
+      <li>처음 시작 시 모델 다운로드 5~15초</li>
     </ul>
     <button id="start-btn">카메라 시작</button>
   </div>
 </div>
 
-<script type="module">
-import {
-  FilesetResolver,
-  FaceLandmarker
-} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/vision_bundle.js";
+<div id="log"></div>
 
-const video = document.getElementById('video');
-const overlay = document.getElementById('overlay');
-const octx = overlay.getContext('2d');
-const statusEl = document.getElementById('status');
+<script>
+// ========== 로깅 (화면에 표시) ==========
+const logEl = document.getElementById('log');
+function log(msg, type = 'info') {
+  const line = document.createElement('div');
+  line.className = type;
+  const time = new Date().toLocaleTimeString('ko-KR');
+  line.textContent = `[${time}] ${msg}`;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+  console.log(`[${type}]`, msg);
+}
+
+// 글로벌 에러 캐치
+window.addEventListener('error', (e) => {
+  log(`ERROR: ${e.message} @ ${e.filename}:${e.lineno}`, 'err');
+  logEl.classList.add('show');
+});
+window.addEventListener('unhandledrejection', (e) => {
+  log(`PROMISE REJECT: ${e.reason}`, 'err');
+  logEl.classList.add('show');
+});
+
+// ========== 환경 체크 ==========
+log('페이지 로드 완료');
+log(`UA: ${navigator.userAgent.substring(0, 80)}...`);
+log(`Protocol: ${location.protocol}`);
+
+if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
+  log('⚠ HTTPS가 아닙니다. 카메라 접근 차단될 수 있음', 'warn');
+  logEl.classList.add('show');
+}
+if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+  log('⚠ getUserMedia 미지원 브라우저', 'err');
+  logEl.classList.add('show');
+}
+
+// ========== UI 핸들러 (즉시 등록) ==========
 const startBtn = document.getElementById('start-btn');
 const resetBtn = document.getElementById('reset-btn');
 const togglePreviewBtn = document.getElementById('toggle-preview');
+const toggleLogBtn = document.getElementById('toggle-log');
+const statusEl = document.getElementById('status');
 const intro = document.getElementById('intro');
 const preview = document.getElementById('preview');
+const video = document.getElementById('video');
+const overlay = document.getElementById('overlay');
+const octx = overlay.getContext('2d');
+
 const quads = {
   TL: document.querySelector('[data-q="TL"]'),
   TR: document.querySelector('[data-q="TR"]'),
@@ -225,14 +244,24 @@ const quads = {
   BR: document.querySelector('[data-q="BR"]'),
 };
 
+toggleLogBtn.addEventListener('click', () => logEl.classList.toggle('show'));
+togglePreviewBtn.addEventListener('click', () => preview.classList.toggle('on'));
+
+let gazeTimes = { TL: 0, TR: 0, BL: 0, BR: 0 };
+resetBtn.addEventListener('click', () => {
+  gazeTimes = { TL: 0, TR: 0, BL: 0, BR: 0 };
+  for (const k of Object.keys(quads)) {
+    quads[k].querySelector('.gaze-time').textContent = '0.0s';
+  }
+  log('통계 리셋');
+});
+
+// ========== 메인 로직 ==========
 let faceLandmarker = null;
 let running = false;
 let lastVideoTime = -1;
 let currentQuad = null;
-let gazeTimes = { TL: 0, TR: 0, BL: 0, BR: 0 };
 let lastTickTime = performance.now();
-
-// 시선 안정화용 버퍼 (jitter 줄이기)
 const smoothBuffer = { x: [], y: [], size: 6 };
 
 function smooth(buf, val) {
@@ -241,40 +270,69 @@ function smooth(buf, val) {
   return buf.reduce((a, b) => a + b, 0) / buf.length;
 }
 
-async function init() {
-  statusEl.textContent = 'MediaPipe 모델 다운로드 중...';
+async function loadMediaPipe() {
+  log('MediaPipe 모듈 로딩 시작...');
+  statusEl.textContent = 'MediaPipe 모듈 다운로드 중...';
+
+  // ES module을 동적 import (catch 가능)
+  let vision;
   try {
-    const filesetResolver = await FilesetResolver.forVisionTasks(
-      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/wasm"
-    );
-    faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+    vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/vision_bundle.mjs');
+    log('vision_bundle 로드 성공');
+  } catch (e) {
+    log(`vision_bundle 로드 실패: ${e.message}`, 'err');
+    throw e;
+  }
+
+  const { FilesetResolver, FaceLandmarker } = vision;
+
+  log('WASM fileset 로딩...');
+  const filesetResolver = await FilesetResolver.forVisionTasks(
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/wasm"
+  );
+  log('WASM fileset 로드 성공');
+
+  log('FaceLandmarker 모델 다운로드 (~5MB)...');
+  statusEl.textContent = '모델 다운로드 중 (5~15초)...';
+
+  // GPU delegate가 iOS에서 실패하면 CPU로 fallback
+  let landmarker;
+  try {
+    landmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
       baseOptions: {
         modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
         delegate: "GPU"
       },
-      outputFaceBlendshapes: false,
       outputFacialTransformationMatrixes: true,
       runningMode: "VIDEO",
       numFaces: 1
     });
-    statusEl.textContent = '모델 준비 완료';
-    statusEl.classList.add('ok');
+    log('FaceLandmarker 생성 성공 (GPU)');
   } catch (e) {
-    statusEl.textContent = '모델 로드 실패: ' + e.message;
-    statusEl.classList.add('err');
-    throw e;
+    log(`GPU 실패, CPU로 재시도: ${e.message}`, 'warn');
+    landmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+      baseOptions: {
+        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+        delegate: "CPU"
+      },
+      outputFacialTransformationMatrixes: true,
+      runningMode: "VIDEO",
+      numFaces: 1
+    });
+    log('FaceLandmarker 생성 성공 (CPU)');
   }
+
+  return landmarker;
 }
 
 async function startCamera() {
   startBtn.disabled = true;
-  startBtn.textContent = '시작 중...';
-
-  if (!faceLandmarker) {
-    try { await init(); } catch (e) { startBtn.disabled = false; startBtn.textContent = '카메라 시작'; return; }
-  }
+  startBtn.textContent = '로딩 중...';
+  log('=== 시작 버튼 클릭됨 ===');
 
   try {
+    // 1. 먼저 카메라 권한 요청 (사용자 제스처 직후라야 iOS에서 통과)
+    log('카메라 권한 요청...');
     const stream = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode: 'user',
@@ -283,82 +341,73 @@ async function startCamera() {
       },
       audio: false
     });
+    log('카메라 권한 획득');
     video.srcObject = stream;
-    await new Promise(res => video.addEventListener('loadeddata', res, { once: true }));
+
+    await new Promise((res, rej) => {
+      video.addEventListener('loadeddata', res, { once: true });
+      setTimeout(() => rej(new Error('비디오 로딩 타임아웃')), 10000);
+    });
+    log(`비디오 준비: ${video.videoWidth}x${video.videoHeight}`);
+
     overlay.width = video.videoWidth;
     overlay.height = video.videoHeight;
+
+    // 2. MediaPipe 로드 (시간 걸리는 작업)
+    if (!faceLandmarker) {
+      faceLandmarker = await loadMediaPipe();
+    }
+
+    // 3. 시작
     intro.style.display = 'none';
     running = true;
     statusEl.textContent = '추적 중';
+    statusEl.classList.remove('err');
     statusEl.classList.add('ok');
+    log('=== 추적 시작 ===');
+    lastTickTime = performance.now();
     requestAnimationFrame(loop);
   } catch (e) {
-    statusEl.textContent = '카메라 접근 실패: ' + e.message;
+    log(`시작 실패: ${e.name}: ${e.message}`, 'err');
+    logEl.classList.add('show');
+    statusEl.textContent = '실패: ' + e.message;
     statusEl.classList.add('err');
     startBtn.disabled = false;
-    startBtn.textContent = '카메라 시작';
+    startBtn.textContent = '다시 시도';
   }
 }
 
-/**
- * 시선 방향 계산:
- * - 머리 회전 (transformation matrix의 yaw/pitch)
- * - 홍채 중심이 눈 boundary 안 어디에 있는지 (눈동자 상대 위치)
- * 두 값을 합쳐 화면 위치 추정
- */
 function estimateGaze(landmarks, matrix) {
-  // 홍채 중심 인덱스 (MediaPipe 478개 랜드마크 기준)
-  // 왼쪽 홍채 중심: 468, 오른쪽 홍채 중심: 473
   const lIris = landmarks[468];
   const rIris = landmarks[473];
-
-  // 왼쪽 눈 좌우 끝: 33 (외측), 133 (내측)
-  // 오른쪽 눈 좌우 끝: 362 (내측), 263 (외측)
   const lEyeOuter = landmarks[33];
   const lEyeInner = landmarks[133];
   const rEyeInner = landmarks[362];
   const rEyeOuter = landmarks[263];
-
-  // 왼쪽 눈 위아래: 159(위), 145(아래)
-  // 오른쪽 눈 위아래: 386(위), 374(아래)
   const lEyeTop = landmarks[159];
   const lEyeBottom = landmarks[145];
   const rEyeTop = landmarks[386];
   const rEyeBottom = landmarks[374];
 
-  // 홍채의 눈 내 상대 위치 (0~1로 정규화)
-  // x: 왼쪽 0, 오른쪽 1
   const lRelX = (lIris.x - lEyeOuter.x) / (lEyeInner.x - lEyeOuter.x);
   const rRelX = (rIris.x - rEyeInner.x) / (rEyeOuter.x - rEyeInner.x);
-  const eyeX = (lRelX + rRelX) / 2; // 평균
+  const eyeX = (lRelX + rRelX) / 2;
 
-  // y: 위 0, 아래 1
   const lRelY = (lIris.y - lEyeTop.y) / (lEyeBottom.y - lEyeTop.y);
   const rRelY = (rIris.y - rEyeTop.y) / (rEyeBottom.y - rEyeTop.y);
   const eyeY = (lRelY + rRelY) / 2;
 
-  // 머리 회전 (transformation matrix에서 추출)
-  // matrix는 column-major 4x4
   let headYaw = 0, headPitch = 0;
   if (matrix && matrix.data) {
     const m = matrix.data;
-    // yaw (Y축 회전), pitch (X축 회전) — 라디안
     headYaw = Math.atan2(m[8], m[10]);
     headPitch = Math.atan2(-m[9], Math.sqrt(m[1]*m[1] + m[5]*m[5]));
   }
 
-  // 화면 좌표 추정 (0~1)
-  // 거울 모드라 x 반전 고려: 카메라 기준 왼쪽 = 화면 오른쪽
-  // 사용자 입장에서는 그대로 사용 (이미 거울로 보고 있음)
-  // eyeX 0.5가 중심, 0이 왼쪽 0.5 이탈
-  // 홍채 상대 위치 + 머리 yaw 합성
-  let screenX = eyeX + headYaw * 0.7; // 가중치는 실험적
+  let screenX = eyeX + headYaw * 0.7;
   let screenY = eyeY + headPitch * 0.7;
-
-  // 0~1로 클램프
   screenX = Math.max(0, Math.min(1, screenX));
   screenY = Math.max(0, Math.min(1, screenY));
-
   return { x: screenX, y: screenY };
 }
 
@@ -385,7 +434,6 @@ function updateGazeTime(q, deltaSec) {
 function drawOverlay(landmarks) {
   octx.clearRect(0, 0, overlay.width, overlay.height);
   if (!landmarks) return;
-  // 홍채만 작게 표시
   octx.fillStyle = '#4ade80';
   for (const idx of [468, 473]) {
     const p = landmarks[idx];
@@ -397,50 +445,42 @@ function drawOverlay(landmarks) {
 
 function loop() {
   if (!running) return;
-
   const now = performance.now();
   const deltaSec = (now - lastTickTime) / 1000;
   lastTickTime = now;
 
   if (video.currentTime !== lastVideoTime) {
     lastVideoTime = video.currentTime;
-    const result = faceLandmarker.detectForVideo(video, now);
-    if (result.faceLandmarks && result.faceLandmarks.length > 0) {
-      const landmarks = result.faceLandmarks[0];
-      const matrix = result.facialTransformationMatrixes
-        ? result.facialTransformationMatrixes[0]
-        : null;
-
-      const gaze = estimateGaze(landmarks, matrix);
-      const sx = smooth(smoothBuffer.x, gaze.x);
-      const sy = smooth(smoothBuffer.y, gaze.y);
-
-      const q = quadrantOf(sx, sy);
-      if (q !== currentQuad) {
-        currentQuad = q;
-        updateQuadUI(q);
+    try {
+      const result = faceLandmarker.detectForVideo(video, now);
+      if (result.faceLandmarks && result.faceLandmarks.length > 0) {
+        const landmarks = result.faceLandmarks[0];
+        const matrix = result.facialTransformationMatrixes
+          ? result.facialTransformationMatrixes[0]
+          : null;
+        const gaze = estimateGaze(landmarks, matrix);
+        const sx = smooth(smoothBuffer.x, gaze.x);
+        const sy = smooth(smoothBuffer.y, gaze.y);
+        const q = quadrantOf(sx, sy);
+        if (q !== currentQuad) {
+          currentQuad = q;
+          updateQuadUI(q);
+        }
+        updateGazeTime(q, deltaSec);
+        drawOverlay(landmarks);
+      } else {
+        octx.clearRect(0, 0, overlay.width, overlay.height);
       }
-      updateGazeTime(q, deltaSec);
-      drawOverlay(landmarks);
-    } else {
-      octx.clearRect(0, 0, overlay.width, overlay.height);
+    } catch (e) {
+      log(`detect 오류: ${e.message}`, 'err');
     }
   }
-
   requestAnimationFrame(loop);
 }
 
-// 이벤트
+// 시작 버튼은 마지막에 바인딩 (모든 함수 정의 후)
 startBtn.addEventListener('click', startCamera);
-resetBtn.addEventListener('click', () => {
-  gazeTimes = { TL: 0, TR: 0, BL: 0, BR: 0 };
-  for (const k of Object.keys(quads)) {
-    quads[k].querySelector('.gaze-time').textContent = '0.0s';
-  }
-});
-togglePreviewBtn.addEventListener('click', () => {
-  preview.classList.toggle('on');
-});
+log('시작 버튼 핸들러 등록 완료. 버튼을 눌러주세요.');
 </script>
 
 </body>
