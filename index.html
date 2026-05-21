@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>객체 감지 (강아지 포함 80종)</title>
+<title>AI 비전 데모 모음</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
@@ -11,30 +11,346 @@
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     background: #0a0a0a; color: #fff; touch-action: none;
   }
-  #app { position: fixed; inset: 0; display: flex; flex-direction: column; }
+  #app { position: fixed; inset: 0; }
 
-  #stage {
+  /* ============ 메뉴 ============ */
+  #menu {
+    position: fixed; inset: 0;
+    background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    padding: 24px;
+    overflow-y: auto;
+  }
+  #menu.hide { display: none; }
+  #menu h1 {
+    font-size: 24px;
+    margin-bottom: 6px;
+    margin-top: 20px;
+  }
+  #menu .subtitle {
+    color: #888;
+    font-size: 13px;
+    margin-bottom: 24px;
+  }
+  .demo-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid #2a2a2a;
+    border-radius: 14px;
+    padding: 18px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    transition: transform 0.15s, border-color 0.15s, background 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .demo-card:active {
+    transform: scale(0.98);
+    background: rgba(37,99,235,0.1);
+    border-color: #2563eb;
+  }
+  .demo-icon {
+    font-size: 40px;
+    flex-shrink: 0;
+    width: 50px;
+    text-align: center;
+  }
+  .demo-info { flex: 1; min-width: 0; }
+  .demo-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .demo-desc {
+    font-size: 12px;
+    color: #888;
+    line-height: 1.4;
+  }
+  .demo-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: #16a34a;
+    color: #fff;
+    margin-left: 6px;
+  }
+  .demo-badge.exp { background: #f59e0b; }
+
+  /* ============ 공통: 모드 컨테이너 ============ */
+  .scene {
+    position: fixed; inset: 0;
+    display: none;
+    flex-direction: column;
+  }
+  .scene.active { display: flex; }
+  .back-btn {
+    position: fixed;
+    top: 12px; left: 12px;
+    z-index: 200;
+    background: rgba(0,0,0,0.7);
+    color: #fff;
+    border: 1px solid #2a2a2a;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+  }
+
+  /* 공용 비디오/캔버스 */
+  .stage-area {
     flex: 1;
     position: relative;
     overflow: hidden;
     background: #000;
   }
-  #video {
-    position: absolute;
-    inset: 0;
+
+  /* 카메라 프리뷰 (시선/손용) */
+  .preview-mini {
+    position: fixed;
+    top: 12px; right: 12px;
+    width: 90px; height: 120px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #2a2a2a;
+    background: #000;
+    z-index: 100;
+    display: none;
+  }
+  .preview-mini.on { display: block; }
+  .preview-mini video, .preview-mini canvas {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    transform: scaleX(-1);
+  }
+
+  /* 풀스크린 비디오 (객체감지용) */
+  .fullscreen-video {
+    position: absolute; inset: 0;
     width: 100%; height: 100%;
     object-fit: cover;
   }
-  #overlay {
-    position: absolute;
-    inset: 0;
+  .fullscreen-overlay {
+    position: absolute; inset: 0;
     width: 100%; height: 100%;
     pointer-events: none;
   }
 
-  #labels {
+  /* 상태 패널 */
+  .panel {
+    background: #0a0a0a;
+    border-top: 1px solid #2a2a2a;
+    padding: 10px 12px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .status-text {
+    flex: 1; font-size: 12px; color: #888; line-height: 1.4;
+  }
+  .status-text.ok { color: #4ade80; }
+  .status-text.err { color: #ef4444; }
+  button {
+    padding: 8px 12px;
+    background: #2563eb; color: white;
+    border: none; border-radius: 6px;
+    font-size: 12px; font-weight: 500; cursor: pointer;
+  }
+  button:disabled { background: #374151; opacity: 0.6; }
+  button.secondary { background: #374151; }
+  button.success { background: #16a34a; }
+  button.danger { background: #dc2626; }
+
+  /* ============ 시선 추적 모드 ============ */
+  #eye-mode .stage-area {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 2px;
+    background: #2a2a2a;
+  }
+  .quad {
+    background: #1a1a1a;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 48px; font-weight: 700; color: #444;
+    transition: background 0.15s, color 0.15s;
+    position: relative;
+  }
+  .quad.active { background: #2563eb; color: #fff; }
+  .quad-label {
+    position: absolute; top: 12px; left: 12px;
+    font-size: 11px; font-weight: 500; color: #666; letter-spacing: 1px;
+  }
+  .quad.active .quad-label { color: rgba(255,255,255,0.7); }
+  .gaze-time {
+    position: absolute; bottom: 12px; right: 12px;
+    font-size: 14px; color: #666; font-variant-numeric: tabular-nums;
+  }
+  .quad.active .gaze-time { color: rgba(255,255,255,0.8); }
+  #gaze-dot {
+    position: fixed;
+    width: 24px; height: 24px;
+    background: rgba(74,222,128,0.5);
+    border: 2px solid #4ade80;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 50;
+    transform: translate(-50%,-50%);
+    display: none;
+    transition: top 0.06s linear, left 0.06s linear;
+  }
+  #gaze-dot.on { display: block; }
+
+  /* 캘리브레이션 오버레이 */
+  #cal-overlay {
+    position: fixed; inset: 0;
+    background: #000;
+    z-index: 800;
+    display: none;
+  }
+  #cal-overlay.on { display: block; }
+  #cal-dot {
     position: absolute;
-    top: 12px; left: 12px;
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #ef4444 30%, rgba(239,68,68,0.3) 70%, transparent);
+    transform: translate(-50%,-50%);
+    transition: top 0.6s ease, left 0.6s ease;
+  }
+  #cal-dot.collecting {
+    animation: pulse 0.6s ease-in-out infinite alternate;
+  }
+  @keyframes pulse {
+    from { transform: translate(-50%,-50%) scale(1); }
+    to { transform: translate(-50%,-50%) scale(1.4); }
+  }
+  #cal-progress {
+    position: absolute;
+    bottom: 60px; left: 50%;
+    transform: translateX(-50%);
+    color: #fff; font-size: 16px; text-align: center;
+    width: 90%;
+  }
+  #cal-progress .ring {
+    width: 60px; height: 60px;
+    margin: 12px auto;
+    border: 4px solid #2a2a2a;
+    border-top-color: #4ade80;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ============ 손 포인터 ============ */
+  #pointer-mode .stage-area {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 2px;
+    background: #2a2a2a;
+  }
+  #finger-cursor {
+    position: absolute;
+    width: 32px; height: 32px;
+    background: radial-gradient(circle, #4ade80 30%, rgba(74,222,128,0.4) 70%, transparent);
+    border-radius: 50%;
+    pointer-events: none;
+    transform: translate(-50%,-50%);
+    z-index: 30;
+    display: none;
+    transition: top 0.05s linear, left 0.05s linear;
+  }
+  #finger-cursor.on { display: block; }
+  #finger-cursor.pinch {
+    background: radial-gradient(circle, #ef4444 30%, rgba(239,68,68,0.4) 70%, transparent);
+    transform: translate(-50%,-50%) scale(1.4);
+  }
+
+  /* ============ 제스처 ============ */
+  #gesture-mode .stage-area {
+    background: #0a0a0a;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  #gesture-emoji {
+    font-size: 200px;
+    line-height: 1;
+    margin-bottom: 24px;
+    filter: grayscale(0.3);
+    transition: transform 0.2s;
+  }
+  #gesture-emoji.active { transform: scale(1.1); filter: grayscale(0); }
+  #gesture-name {
+    font-size: 32px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: #fff;
+    text-align: center;
+  }
+  #gesture-name.none { color: #444; }
+  #gesture-confidence {
+    font-size: 14px;
+    color: #888;
+    font-variant-numeric: tabular-nums;
+  }
+  #gesture-history {
+    margin-top: 32px;
+    display: flex;
+    gap: 12px;
+    font-size: 36px;
+    opacity: 0.4;
+  }
+  .hist-item {
+    width: 50px; height: 50px;
+    display: flex; align-items: center; justify-content: center;
+    background: #1a1a1a;
+    border-radius: 8px;
+  }
+
+  /* ============ 드로잉 ============ */
+  #drawing-mode .stage-area { background: #0a0a0a; }
+  #draw-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%; height: 100%;
+  }
+  #draw-info {
+    position: absolute;
+    top: 60px; left: 12px;
+    background: rgba(0,0,0,0.7);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 11px;
+    color: #ccc;
+    z-index: 20;
+    line-height: 1.5;
+  }
+  #draw-info strong { color: #4ade80; }
+  #color-picker {
+    position: absolute;
+    top: 12px; right: 110px;
+    display: flex;
+    gap: 6px;
+    z-index: 20;
+  }
+  .color-btn {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+  }
+  .color-btn.active { border-color: #fff; }
+
+  /* ============ 객체 감지 ============ */
+  #object-mode #obj-labels {
+    position: absolute;
+    top: 60px; left: 12px;
     background: rgba(0,0,0,0.7);
     padding: 10px 12px;
     border-radius: 8px;
@@ -46,26 +362,20 @@
     overflow-y: auto;
     backdrop-filter: blur(10px);
   }
-  #labels.empty { display: none; }
+  #obj-labels.empty { display: none; }
   .label-row {
     display: flex;
     align-items: center;
     gap: 8px;
     margin-bottom: 4px;
   }
-  .label-row:last-child { margin-bottom: 0; }
-  .label-dot {
-    width: 10px; height: 10px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
+  .label-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
   .label-name { flex: 1; color: #fff; font-weight: 500; }
   .label-conf {
     color: #888;
     font-variant-numeric: tabular-nums;
     font-size: 12px;
   }
-
   #cam-switch {
     position: absolute;
     top: 12px; right: 12px;
@@ -79,7 +389,6 @@
     border: 1px solid #2a2a2a;
     backdrop-filter: blur(10px);
   }
-
   #fps {
     position: absolute;
     bottom: 12px; left: 12px;
@@ -91,62 +400,7 @@
     color: #4ade80;
     font-family: 'SF Mono', Menlo, monospace;
     font-variant-numeric: tabular-nums;
-    backdrop-filter: blur(10px);
   }
-
-  #panel {
-    background: #0a0a0a;
-    border-top: 1px solid #2a2a2a;
-    padding: 10px 12px;
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    flex-shrink: 0;
-  }
-  #status {
-    flex: 1; font-size: 12px; color: #888; line-height: 1.4;
-  }
-  #status.ok { color: #4ade80; }
-  #status.err { color: #ef4444; }
-  button {
-    padding: 8px 12px;
-    background: #2563eb; color: white;
-    border: none; border-radius: 6px;
-    font-size: 12px; font-weight: 500; cursor: pointer;
-  }
-  button:disabled { background: #374151; opacity: 0.6; }
-  button.secondary { background: #374151; }
-
-  #intro {
-    position: fixed; inset: 0;
-    background: rgba(10,10,10,0.98);
-    z-index: 1000;
-    display: flex;
-    align-items: center; justify-content: center;
-    padding: 24px;
-  }
-  .intro-card { max-width: 360px; text-align: center; }
-  .intro-card h1 { font-size: 22px; margin-bottom: 16px; }
-  .intro-card p {
-    color: #aaa; font-size: 14px;
-    line-height: 1.6; margin-bottom: 20px;
-  }
-  .intro-card ul {
-    text-align: left; color: #888; font-size: 13px;
-    line-height: 1.8; margin-bottom: 20px; padding-left: 20px;
-  }
-  .intro-card button { width: 100%; padding: 14px; font-size: 15px; }
-  .cat-list {
-    background: #1a1a1a;
-    padding: 10px;
-    border-radius: 8px;
-    font-size: 11px;
-    color: #888;
-    margin-bottom: 20px;
-    line-height: 1.5;
-    text-align: left;
-  }
-
   #thresh-bar {
     position: absolute;
     bottom: 12px; right: 12px;
@@ -159,18 +413,11 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    backdrop-filter: blur(10px);
   }
-  #thresh-bar input {
-    width: 80px;
-    accent-color: #2563eb;
-  }
-  #thresh-val {
-    color: #4ade80;
-    font-variant-numeric: tabular-nums;
-    min-width: 28px;
-  }
+  #thresh-bar input { width: 80px; accent-color: #2563eb; }
+  #thresh-val { color: #4ade80; min-width: 28px; font-variant-numeric: tabular-nums; }
 
+  /* ============ 공용 로그 ============ */
   #log {
     position: fixed;
     left: 12px; right: 12px; bottom: 70px;
@@ -188,53 +435,213 @@
   #log.show { display: block; }
   #log .err { color: #ef4444; }
   #log .warn { color: #f59e0b; }
+
+  /* 로딩 화면 */
+  #loading {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.95);
+    z-index: 3000;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+  }
+  #loading.on { display: flex; }
+  #loading .ring {
+    width: 60px; height: 60px;
+    border: 4px solid #2a2a2a;
+    border-top-color: #4ade80;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  #loading-text { color: #fff; font-size: 14px; }
+  #loading-detail { color: #888; font-size: 12px; }
 </style>
 </head>
 <body>
 
 <div id="app">
-  <div id="stage">
-    <video id="video" autoplay playsinline muted></video>
-    <canvas id="overlay"></canvas>
-    <div id="labels" class="empty"></div>
-    <div id="cam-switch">📷 전환</div>
-    <div id="fps">-- fps</div>
-    <div id="thresh-bar">
-      신뢰도 ≥ <span id="thresh-val">50%</span>
-      <input type="range" id="thresh" min="20" max="90" value="50">
+
+  <!-- ============ 메인 메뉴 ============ -->
+  <div id="menu">
+    <h1>🎥 AI 비전 데모</h1>
+    <div class="subtitle">카메라로 시선·손·객체를 인식합니다</div>
+
+    <div class="demo-card" data-demo="eye">
+      <div class="demo-icon">👁️</div>
+      <div class="demo-info">
+        <div class="demo-title">시선 추적 <span class="demo-badge exp">실험적</span></div>
+        <div class="demo-desc">눈동자로 화면 4분면 중 어디를 보는지 추적. 캘리브레이션 필요.</div>
+      </div>
+    </div>
+
+    <div class="demo-card" data-demo="pointer">
+      <div class="demo-icon">👆</div>
+      <div class="demo-info">
+        <div class="demo-title">손 포인터 <span class="demo-badge">잘됨</span></div>
+        <div class="demo-desc">검지로 화면 가리키기 + 엄지/검지 핀치로 클릭.</div>
+      </div>
+    </div>
+
+    <div class="demo-card" data-demo="gesture">
+      <div class="demo-icon">✋</div>
+      <div class="demo-info">
+        <div class="demo-title">제스처 인식 <span class="demo-badge">잘됨</span></div>
+        <div class="demo-desc">주먹/보/가위/엄지척/V/OK 6가지 손 모양 분류.</div>
+      </div>
+    </div>
+
+    <div class="demo-card" data-demo="drawing">
+      <div class="demo-icon">🎨</div>
+      <div class="demo-info">
+        <div class="demo-title">허공 드로잉 <span class="demo-badge">잘됨</span></div>
+        <div class="demo-desc">검지로 그리기, 주먹으로 멈춤, 보자기로 지우기.</div>
+      </div>
+    </div>
+
+    <div class="demo-card" data-demo="object">
+      <div class="demo-icon">🔍</div>
+      <div class="demo-info">
+        <div class="demo-title">객체 감지 <span class="demo-badge">잘됨</span></div>
+        <div class="demo-desc">강아지·고양이·사물 등 80종을 박스로 표시.</div>
+      </div>
     </div>
   </div>
 
-  <div id="panel">
-    <div id="status">대기 중</div>
-    <button id="toggle-log" class="secondary">로그</button>
-  </div>
-</div>
-
-<div id="intro">
-  <div class="intro-card">
-    <h1>🔍 객체 감지</h1>
-    <p>카메라에 잡히는 물체를 실시간으로<br>박스로 표시하고 이름을 알려줍니다.</p>
-    <div class="cat-list">
-      <strong style="color:#fff">인식 가능 (80종):</strong><br>
-      🐕 동물 — 강아지, 고양이, 새, 말, 양, 소, 코끼리, 곰, 얼룩말, 기린<br>
-      🚗 탈것 — 자전거, 차, 오토바이, 비행기, 버스, 기차, 보트<br>
-      🍔 음식 — 사과, 바나나, 샌드위치, 피자, 케이크 등<br>
-      🪑 사물 — 의자, 소파, TV, 노트북, 휴대폰, 책 등<br>
-      ⚽ 기타 — 사람, 가방, 우산, 공, 그릇 등
+  <!-- ============ 시선 추적 ============ -->
+  <div id="eye-mode" class="scene">
+    <button class="back-btn" data-back>← 뒤로</button>
+    <div class="stage-area">
+      <div class="quad" data-q="TL"><span class="quad-label">좌상</span>↖<span class="gaze-time">0.0s</span></div>
+      <div class="quad" data-q="TR"><span class="quad-label">우상</span>↗<span class="gaze-time">0.0s</span></div>
+      <div class="quad" data-q="BL"><span class="quad-label">좌하</span>↙<span class="gaze-time">0.0s</span></div>
+      <div class="quad" data-q="BR"><span class="quad-label">우하</span>↘<span class="gaze-time">0.0s</span></div>
     </div>
-    <ul>
-      <li>전/후면 카메라 전환 (강아지는 후면 권장)</li>
-      <li>여러 객체 동시 인식</li>
-      <li>박스가 움직임 따라 추적</li>
-    </ul>
-    <button id="start-btn">카메라 시작</button>
+    <div class="panel">
+      <div id="eye-status" class="status-text">대기 중</div>
+      <button id="recal-btn" class="secondary" disabled>재캘리</button>
+      <button id="eye-dot-btn" class="secondary">시선점</button>
+      <button id="eye-reset-btn" class="secondary">리셋</button>
+    </div>
+    <div id="gaze-dot"></div>
+    <div class="preview-mini" id="eye-preview">
+      <video autoplay playsinline muted></video>
+      <canvas></canvas>
+    </div>
   </div>
-</div>
 
-<div id="log"></div>
+  <!-- 캘리브레이션 오버레이 (시선만) -->
+  <div id="cal-overlay">
+    <div id="cal-dot"></div>
+    <div id="cal-progress">
+      <div id="cal-text">점을 응시하세요</div>
+      <div class="ring"></div>
+      <div id="cal-counter" style="font-size:13px;color:#888;margin-top:8px;">1 / 9</div>
+    </div>
+  </div>
+
+  <!-- ============ 손 포인터 ============ -->
+  <div id="pointer-mode" class="scene">
+    <button class="back-btn" data-back>← 뒤로</button>
+    <div class="stage-area">
+      <div class="quad" data-q="TL"><span class="quad-label">좌상</span>↖</div>
+      <div class="quad" data-q="TR"><span class="quad-label">우상</span>↗</div>
+      <div class="quad" data-q="BL"><span class="quad-label">좌하</span>↙</div>
+      <div class="quad" data-q="BR"><span class="quad-label">우하</span>↘</div>
+      <div id="finger-cursor"></div>
+    </div>
+    <div class="panel">
+      <div id="pointer-status" class="status-text">대기 중</div>
+    </div>
+    <div class="preview-mini" id="pointer-preview">
+      <video autoplay playsinline muted></video>
+      <canvas></canvas>
+    </div>
+  </div>
+
+  <!-- ============ 제스처 ============ -->
+  <div id="gesture-mode" class="scene">
+    <button class="back-btn" data-back>← 뒤로</button>
+    <div class="stage-area">
+      <div id="gesture-emoji">🖐️</div>
+      <div id="gesture-name" class="none">손을 보여주세요</div>
+      <div id="gesture-confidence">대기 중</div>
+      <div id="gesture-history"></div>
+    </div>
+    <div class="panel">
+      <div id="gesture-status" class="status-text">대기 중</div>
+      <button id="gesture-clear" class="secondary">히스토리</button>
+    </div>
+    <div class="preview-mini" id="gesture-preview">
+      <video autoplay playsinline muted></video>
+      <canvas></canvas>
+    </div>
+  </div>
+
+  <!-- ============ 드로잉 ============ -->
+  <div id="drawing-mode" class="scene">
+    <button class="back-btn" data-back>← 뒤로</button>
+    <div class="stage-area">
+      <canvas id="draw-canvas"></canvas>
+      <div id="draw-info">
+        <strong>검지만</strong>: 그리기<br>
+        <strong>주먹</strong>: 멈춤<br>
+        <strong>보자기</strong>: 전체 지우기
+      </div>
+      <div id="color-picker">
+        <div class="color-btn active" data-color="#4ade80" style="background:#4ade80"></div>
+        <div class="color-btn" data-color="#3b82f6" style="background:#3b82f6"></div>
+        <div class="color-btn" data-color="#ef4444" style="background:#ef4444"></div>
+        <div class="color-btn" data-color="#f59e0b" style="background:#f59e0b"></div>
+        <div class="color-btn" data-color="#ffffff" style="background:#ffffff"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div id="drawing-status" class="status-text">대기 중</div>
+      <button id="draw-clear" class="danger">전체 지우기</button>
+    </div>
+    <div class="preview-mini" id="drawing-preview">
+      <video autoplay playsinline muted></video>
+      <canvas></canvas>
+    </div>
+  </div>
+
+  <!-- ============ 객체 감지 ============ -->
+  <div id="object-mode" class="scene">
+    <button class="back-btn" data-back>← 뒤로</button>
+    <div class="stage-area">
+      <video id="obj-video" class="fullscreen-video" autoplay playsinline muted></video>
+      <canvas id="obj-overlay" class="fullscreen-overlay"></canvas>
+      <div id="obj-labels" class="empty"></div>
+      <div id="cam-switch">📷 전환</div>
+      <div id="fps">-- fps</div>
+      <div id="thresh-bar">
+        신뢰도 ≥ <span id="thresh-val">50%</span>
+        <input type="range" id="thresh" min="20" max="90" value="50">
+      </div>
+    </div>
+    <div class="panel">
+      <div id="object-status" class="status-text">대기 중</div>
+      <button id="toggle-log" class="secondary">로그</button>
+    </div>
+  </div>
+
+  <!-- 공용 로딩 -->
+  <div id="loading">
+    <div class="ring"></div>
+    <div id="loading-text">초기화 중...</div>
+    <div id="loading-detail"></div>
+  </div>
+
+  <div id="log"></div>
+</div>
 
 <script>
+// =================================================================
+// 공통: 로그, 카메라, MediaPipe 로더
+// =================================================================
+
 const logEl = document.getElementById('log');
 function log(msg, type = 'info') {
   const line = document.createElement('div');
@@ -254,90 +661,106 @@ window.addEventListener('unhandledrejection', (e) => {
   logEl.classList.add('show');
 });
 
-// 한국어 라벨
-const KO_LABELS = {
-  'person': '사람', 'bicycle': '자전거', 'car': '자동차',
-  'motorcycle': '오토바이', 'airplane': '비행기', 'bus': '버스',
-  'train': '기차', 'truck': '트럭', 'boat': '보트',
-  'traffic light': '신호등', 'fire hydrant': '소화전', 'stop sign': '정지 표지',
-  'parking meter': '주차요금기', 'bench': '벤치',
-  'bird': '새', 'cat': '고양이', 'dog': '강아지', 'horse': '말',
-  'sheep': '양', 'cow': '소', 'elephant': '코끼리', 'bear': '곰',
-  'zebra': '얼룩말', 'giraffe': '기린',
-  'backpack': '가방', 'umbrella': '우산', 'handbag': '핸드백',
-  'tie': '넥타이', 'suitcase': '여행가방',
-  'frisbee': '프리스비', 'skis': '스키', 'snowboard': '스노보드',
-  'sports ball': '공', 'kite': '연', 'baseball bat': '야구방망이',
-  'baseball glove': '야구글러브', 'skateboard': '스케이트보드',
-  'surfboard': '서핑보드', 'tennis racket': '테니스라켓',
-  'bottle': '병', 'wine glass': '와인잔', 'cup': '컵',
-  'fork': '포크', 'knife': '칼', 'spoon': '숟가락', 'bowl': '그릇',
-  'banana': '바나나', 'apple': '사과', 'sandwich': '샌드위치',
-  'orange': '오렌지', 'broccoli': '브로콜리', 'carrot': '당근',
-  'hot dog': '핫도그', 'pizza': '피자', 'donut': '도넛', 'cake': '케이크',
-  'chair': '의자', 'couch': '소파', 'potted plant': '화분',
-  'bed': '침대', 'dining table': '식탁', 'toilet': '변기',
-  'tv': 'TV', 'laptop': '노트북', 'mouse': '마우스',
-  'remote': '리모컨', 'keyboard': '키보드', 'cell phone': '휴대폰',
-  'microwave': '전자레인지', 'oven': '오븐', 'toaster': '토스터',
-  'sink': '싱크대', 'refrigerator': '냉장고',
-  'book': '책', 'clock': '시계', 'vase': '꽃병',
-  'scissors': '가위', 'teddy bear': '곰인형',
-  'hair drier': '드라이어', 'toothbrush': '칫솔',
-};
-
-const CATEGORY_COLORS = {
-  'bird': '#4ade80', 'cat': '#4ade80', 'dog': '#4ade80',
-  'horse': '#4ade80', 'sheep': '#4ade80', 'cow': '#4ade80',
-  'elephant': '#4ade80', 'bear': '#4ade80',
-  'zebra': '#4ade80', 'giraffe': '#4ade80',
-  'person': '#fbbf24',
-  'bicycle': '#3b82f6', 'car': '#3b82f6', 'motorcycle': '#3b82f6',
-  'airplane': '#3b82f6', 'bus': '#3b82f6', 'train': '#3b82f6',
-  'truck': '#3b82f6', 'boat': '#3b82f6',
-};
-function colorFor(name) {
-  return CATEGORY_COLORS[name] || '#ef4444';
+const loadingEl = document.getElementById('loading');
+const loadingText = document.getElementById('loading-text');
+const loadingDetail = document.getElementById('loading-detail');
+function showLoading(text, detail = '') {
+  loadingText.textContent = text;
+  loadingDetail.textContent = detail;
+  loadingEl.classList.add('on');
 }
-function koLabel(en) {
-  return KO_LABELS[en] || en;
+function hideLoading() { loadingEl.classList.remove('on'); }
+
+// MediaPipe 모듈 캐시 (한 번만 로드)
+let visionModule = null;
+let filesetResolver = null;
+async function getVision() {
+  if (visionModule) return visionModule;
+  showLoading('MediaPipe 로딩...', '약 1MB');
+  visionModule = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/vision_bundle.mjs');
+  log('vision_bundle 로드 완료');
+  return visionModule;
 }
-
-const startBtn = document.getElementById('start-btn');
-const toggleLogBtn = document.getElementById('toggle-log');
-const camSwitch = document.getElementById('cam-switch');
-const statusEl = document.getElementById('status');
-const intro = document.getElementById('intro');
-const video = document.getElementById('video');
-const overlay = document.getElementById('overlay');
-const octx = overlay.getContext('2d');
-const labelsEl = document.getElementById('labels');
-const fpsEl = document.getElementById('fps');
-const threshSlider = document.getElementById('thresh');
-const threshVal = document.getElementById('thresh-val');
-
-let objectDetector = null;
-let running = false;
-let lastVideoTime = -1;
-let currentFacing = 'environment';
-let currentStream = null;
-let threshold = 0.5;
-let frameTimes = [];
-
-async function loadObjectDetector() {
-  log('MediaPipe 로딩...');
-  const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/vision_bundle.mjs');
-  const { FilesetResolver, ObjectDetector } = vision;
-
-  log('WASM fileset 로딩...');
-  const filesetResolver = await FilesetResolver.forVisionTasks(
+async function getFileset() {
+  if (filesetResolver) return filesetResolver;
+  const vision = await getVision();
+  filesetResolver = await vision.FilesetResolver.forVisionTasks(
     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/wasm"
   );
+  log('WASM fileset 로드 완료');
+  return filesetResolver;
+}
 
-  log('Object Detector 모델 다운로드...');
-  let detector;
+// 모델 캐시
+const models = { face: null, hand: null, object: null };
+
+async function getFaceLandmarker() {
+  if (models.face) return models.face;
+  showLoading('Face 모델 로딩...', '~5MB');
+  const vision = await getVision();
+  const fr = await getFileset();
   try {
-    detector = await ObjectDetector.createFromOptions(filesetResolver, {
+    models.face = await vision.FaceLandmarker.createFromOptions(fr, {
+      baseOptions: {
+        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+        delegate: "GPU"
+      },
+      outputFacialTransformationMatrixes: true,
+      runningMode: "VIDEO",
+      numFaces: 1
+    });
+    log('Face Landmarker (GPU)');
+  } catch (e) {
+    log(`Face GPU 실패, CPU로: ${e.message}`, 'warn');
+    models.face = await vision.FaceLandmarker.createFromOptions(fr, {
+      baseOptions: {
+        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+        delegate: "CPU"
+      },
+      outputFacialTransformationMatrixes: true,
+      runningMode: "VIDEO",
+      numFaces: 1
+    });
+  }
+  return models.face;
+}
+
+async function getHandLandmarker() {
+  if (models.hand) return models.hand;
+  showLoading('Hand 모델 로딩...', '~7MB');
+  const vision = await getVision();
+  const fr = await getFileset();
+  try {
+    models.hand = await vision.HandLandmarker.createFromOptions(fr, {
+      baseOptions: {
+        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+        delegate: "GPU"
+      },
+      runningMode: "VIDEO",
+      numHands: 1
+    });
+    log('Hand Landmarker (GPU)');
+  } catch (e) {
+    log(`Hand GPU 실패, CPU로: ${e.message}`, 'warn');
+    models.hand = await vision.HandLandmarker.createFromOptions(fr, {
+      baseOptions: {
+        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+        delegate: "CPU"
+      },
+      runningMode: "VIDEO",
+      numHands: 1
+    });
+  }
+  return models.hand;
+}
+
+async function getObjectDetector() {
+  if (models.object) return models.object;
+  showLoading('Object 모델 로딩...', '~5MB');
+  const vision = await getVision();
+  const fr = await getFileset();
+  try {
+    models.object = await vision.ObjectDetector.createFromOptions(fr, {
       baseOptions: {
         modelAssetPath: "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite",
         delegate: "GPU"
@@ -346,10 +769,10 @@ async function loadObjectDetector() {
       maxResults: 10,
       runningMode: "VIDEO"
     });
-    log('GPU 모드');
+    log('Object Detector (GPU)');
   } catch (e) {
-    log(`GPU 실패, CPU로: ${e.message}`, 'warn');
-    detector = await ObjectDetector.createFromOptions(filesetResolver, {
+    log(`Object GPU 실패, CPU로: ${e.message}`, 'warn');
+    models.object = await vision.ObjectDetector.createFromOptions(fr, {
       baseOptions: {
         modelAssetPath: "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite",
         delegate: "CPU"
@@ -358,16 +781,17 @@ async function loadObjectDetector() {
       maxResults: 10,
       runningMode: "VIDEO"
     });
-    log('CPU 모드');
   }
-  return detector;
+  return models.object;
 }
 
-async function openCamera(facing) {
-  if (currentStream) {
-    currentStream.getTracks().forEach(t => t.stop());
+// 카메라 스트림 관리 (모드 전환 시 정리)
+let activeStream = null;
+async function openCamera(facing = 'user') {
+  if (activeStream) {
+    activeStream.getTracks().forEach(t => t.stop());
+    activeStream = null;
   }
-  log(`카메라 요청: ${facing}`);
   const stream = await navigator.mediaDevices.getUserMedia({
     video: {
       facingMode: facing,
@@ -376,228 +800,912 @@ async function openCamera(facing) {
     },
     audio: false
   });
-  currentStream = stream;
-  video.srcObject = stream;
-  await new Promise((res, rej) => {
-    video.addEventListener('loadeddata', res, { once: true });
-    setTimeout(() => rej(new Error('비디오 타임아웃')), 10000);
-  });
-
-  // 전면 카메라일 땐 거울 모드
-  if (facing === 'user') {
-    video.style.transform = 'scaleX(-1)';
-    overlay.style.transform = 'scaleX(-1)';
-  } else {
-    video.style.transform = 'none';
-    overlay.style.transform = 'none';
+  activeStream = stream;
+  return stream;
+}
+function closeCamera() {
+  if (activeStream) {
+    activeStream.getTracks().forEach(t => t.stop());
+    activeStream = null;
   }
-
-  resizeOverlay();
-  log(`비디오: ${video.videoWidth}x${video.videoHeight}`);
 }
 
-function resizeOverlay() {
-  const rect = video.getBoundingClientRect();
-  overlay.width = rect.width;
-  overlay.height = rect.height;
+async function attachStream(videoEl, stream) {
+  videoEl.srcObject = stream;
+  await new Promise((res, rej) => {
+    videoEl.addEventListener('loadeddata', res, { once: true });
+    setTimeout(() => rej(new Error('비디오 로딩 타임아웃')), 10000);
+  });
 }
-window.addEventListener('resize', resizeOverlay);
 
-async function startApp() {
-  startBtn.disabled = true;
-  startBtn.textContent = '준비 중...';
+// =================================================================
+// 라우팅: 메뉴 ↔ 모드
+// =================================================================
+
+const menu = document.getElementById('menu');
+const scenes = document.querySelectorAll('.scene');
+let currentDemo = null;
+let demoCleanup = null;
+
+function showMenu() {
+  if (demoCleanup) {
+    try { demoCleanup(); } catch (e) { log('cleanup 오류: ' + e.message, 'warn'); }
+    demoCleanup = null;
+  }
+  closeCamera();
+  scenes.forEach(s => s.classList.remove('active'));
+  menu.classList.remove('hide');
+  currentDemo = null;
+}
+
+async function showDemo(name) {
+  menu.classList.add('hide');
+  scenes.forEach(s => s.classList.remove('active'));
+  document.getElementById(`${name}-mode`).classList.add('active');
+  currentDemo = name;
 
   try {
-    await openCamera(currentFacing);
-    if (!objectDetector) {
-      objectDetector = await loadObjectDetector();
-    }
-    intro.style.display = 'none';
-    running = true;
-    statusEl.textContent = '감지 중';
-    statusEl.className = 'ok';
-    requestAnimationFrame(loop);
+    if (name === 'eye') demoCleanup = await startEyeMode();
+    else if (name === 'pointer') demoCleanup = await startPointerMode();
+    else if (name === 'gesture') demoCleanup = await startGestureMode();
+    else if (name === 'drawing') demoCleanup = await startDrawingMode();
+    else if (name === 'object') demoCleanup = await startObjectMode();
   } catch (e) {
-    log(`시작 실패: ${e.message}`, 'err');
-    statusEl.textContent = '실패: ' + e.message;
-    statusEl.className = 'err';
-    startBtn.disabled = false;
-    startBtn.textContent = '다시 시도';
+    log(`${name} 시작 실패: ${e.message}`, 'err');
     logEl.classList.add('show');
+    hideLoading();
   }
 }
 
-// object-fit: cover 를 고려한 비디오 → 캔버스 좌표 변환
-// 비디오의 일부가 잘린 채 화면을 꽉 채우므로 그 잘림을 계산해야 함
-function computeVideoFit(vw, vh, cw, ch) {
-  const videoAspect = vw / vh;
-  const canvasAspect = cw / ch;
+document.querySelectorAll('.demo-card').forEach(card => {
+  card.addEventListener('click', () => showDemo(card.dataset.demo));
+});
+document.querySelectorAll('[data-back]').forEach(btn => {
+  btn.addEventListener('click', showMenu);
+});
 
-  let drawW, drawH, offsetX, offsetY;
-  if (videoAspect > canvasAspect) {
-    // 비디오가 더 넓음 → 높이 기준으로 채우고 좌우가 잘림
-    drawH = ch;
-    drawW = ch * videoAspect;
-    offsetX = (cw - drawW) / 2;
-    offsetY = 0;
-  } else {
-    // 비디오가 더 좁음 → 너비 기준으로 채우고 상하가 잘림
-    drawW = cw;
-    drawH = cw / videoAspect;
-    offsetX = 0;
-    offsetY = (ch - drawH) / 2;
+// =================================================================
+// 모드 1: 시선 추적 (캘리브레이션 + 다항회귀)
+// =================================================================
+
+async function startEyeMode() {
+  const statusEl = document.getElementById('eye-status');
+  const recalBtn = document.getElementById('recal-btn');
+  const dotBtn = document.getElementById('eye-dot-btn');
+  const resetBtn = document.getElementById('eye-reset-btn');
+  const previewEl = document.getElementById('eye-preview');
+  const video = previewEl.querySelector('video');
+  const overlay = previewEl.querySelector('canvas');
+  const octx = overlay.getContext('2d');
+  const gazeDot = document.getElementById('gaze-dot');
+  const calOverlay = document.getElementById('cal-overlay');
+  const calDot = document.getElementById('cal-dot');
+  const calText = document.getElementById('cal-text');
+  const calCounter = document.getElementById('cal-counter');
+
+  const quads = {
+    TL: document.querySelector('#eye-mode [data-q="TL"]'),
+    TR: document.querySelector('#eye-mode [data-q="TR"]'),
+    BL: document.querySelector('#eye-mode [data-q="BL"]'),
+    BR: document.querySelector('#eye-mode [data-q="BR"]'),
+  };
+
+  // 상태
+  let running = true;
+  let lastVideoTime = -1;
+  let currentQuad = null;
+  let gazeTimes = { TL: 0, TR: 0, BL: 0, BR: 0 };
+  let lastTickTime = performance.now();
+  let showGaze = false;
+  let calibration = { done: false, axx: 0, ax: 1, bx: 0, ayy: 0, ay: 1, by: 0 };
+  let calSamples = [];
+  let calCollecting = false;
+  let calCurrent = { sx: 0, sy: 0, n: 0 };
+  const smoothBuf = { x: [], y: [], size: 8 };
+
+  function smooth(buf, val) {
+    buf.push(val);
+    if (buf.length > smoothBuf.size) buf.shift();
+    return buf.reduce((a, b) => a + b, 0) / buf.length;
   }
-  const sx = drawW / vw;
-  const sy = drawH / vh;
-  return { sx, sy, offsetX, offsetY };
-}
 
-function drawDetections(detections, vw, vh, cw, ch) {
-  octx.clearRect(0, 0, cw, ch);
-  const fit = computeVideoFit(vw, vh, cw, ch);
+  // 카메라 + 모델
+  showLoading('카메라 시작...', '');
+  const stream = await openCamera('user');
+  await attachStream(video, stream);
+  overlay.width = video.videoWidth;
+  overlay.height = video.videoHeight;
+  previewEl.classList.add('on');
 
-  const validDetections = [];
-  for (const d of detections) {
-    const cat = d.categories[0];
-    if (!cat || cat.score < threshold) continue;
-    validDetections.push(d);
+  const face = await getFaceLandmarker();
+  hideLoading();
+  statusEl.textContent = '캘리브레이션 준비 중...';
 
-    const bbox = d.boundingBox;
-    const x = bbox.originX * fit.sx + fit.offsetX;
-    const y = bbox.originY * fit.sy + fit.offsetY;
-    const w = bbox.width * fit.sx;
-    const h = bbox.height * fit.sy;
+  function getRawGaze(lm, matrix) {
+    const lIris = lm[468], rIris = lm[473];
+    const lEyeOuter = lm[33], lEyeInner = lm[133];
+    const rEyeInner = lm[362], rEyeOuter = lm[263];
+    const lEyeTop = lm[159], lEyeBottom = lm[145];
+    const rEyeTop = lm[386], rEyeBottom = lm[374];
+    const lRelX = (lIris.x - lEyeOuter.x) / (lEyeInner.x - lEyeOuter.x);
+    const rRelX = (rIris.x - rEyeInner.x) / (rEyeOuter.x - rEyeInner.x);
+    const eyeX = (lRelX + rRelX) / 2;
+    const lRelY = (lIris.y - lEyeTop.y) / (lEyeBottom.y - lEyeTop.y);
+    const rRelY = (rIris.y - rEyeTop.y) / (rEyeBottom.y - rEyeTop.y);
+    const eyeY = (lRelY + rRelY) / 2;
+    let yaw = 0, pitch = 0;
+    if (matrix && matrix.data) {
+      const m = matrix.data;
+      yaw = Math.atan2(m[8], m[10]);
+      pitch = Math.atan2(-m[9], Math.sqrt(m[1]*m[1] + m[5]*m[5]));
+    }
+    return { rawX: eyeX + yaw, rawY: eyeY + pitch };
+  }
 
-    const color = colorFor(cat.categoryName);
-    const ko = koLabel(cat.categoryName);
-    const conf = (cat.score * 100).toFixed(0);
+  function rawToScreen(rx, ry) {
+    let sx = calibration.axx * rx * rx + calibration.ax * rx + calibration.bx;
+    let sy = calibration.ayy * ry * ry + calibration.ay * ry + calibration.by;
+    return { x: Math.max(0, Math.min(1, sx)), y: Math.max(0, Math.min(1, sy)) };
+  }
 
-    // 박스 (안쪽으로 살짝 그라데이션 효과)
-    octx.strokeStyle = color;
-    octx.lineWidth = 3;
-    octx.strokeRect(x, y, w, h);
+  function polyReg2(xs, ys) {
+    const n = xs.length;
+    if (n < 3) return null;
+    let sx=0,sx2=0,sx3=0,sx4=0,sy=0,sxy=0,sx2y=0;
+    for (let i = 0; i < n; i++) {
+      const x = xs[i], y = ys[i], x2 = x*x;
+      sx += x; sx2 += x2; sx3 += x2*x; sx4 += x2*x2;
+      sy += y; sxy += x*y; sx2y += x2*y;
+    }
+    const M = [
+      [sx4, sx3, sx2, sx2y],
+      [sx3, sx2, sx,  sxy],
+      [sx2, sx,  n,   sy],
+    ];
+    for (let i = 0; i < 3; i++) {
+      let mr = i;
+      for (let k = i+1; k < 3; k++) if (Math.abs(M[k][i]) > Math.abs(M[mr][i])) mr = k;
+      [M[i], M[mr]] = [M[mr], M[i]];
+      if (Math.abs(M[i][i]) < 1e-10) return null;
+      for (let k = i+1; k < 3; k++) {
+        const f = M[k][i] / M[i][i];
+        for (let j = i; j < 4; j++) M[k][j] -= f * M[i][j];
+      }
+    }
+    const x = [0,0,0];
+    for (let i = 2; i >= 0; i--) {
+      let s = M[i][3];
+      for (let j = i+1; j < 3; j++) s -= M[i][j] * x[j];
+      x[i] = s / M[i][i];
+    }
+    return { a: x[0], b: x[1], c: x[2] };
+  }
 
-    // 라벨
-    const text = `${ko} ${conf}%`;
-    octx.font = 'bold 14px -apple-system, sans-serif';
-    const textW = octx.measureText(text).width + 12;
-    const textH = 22;
+  const CAL_POINTS = [
+    { name: '좌상', xPct: 10, yPct: 10 },
+    { name: '중상', xPct: 50, yPct: 10 },
+    { name: '우상', xPct: 90, yPct: 10 },
+    { name: '좌중', xPct: 10, yPct: 50 },
+    { name: '중앙', xPct: 50, yPct: 50 },
+    { name: '우중', xPct: 90, yPct: 50 },
+    { name: '좌하', xPct: 10, yPct: 90 },
+    { name: '중하', xPct: 50, yPct: 90 },
+    { name: '우하', xPct: 90, yPct: 90 },
+  ];
 
-    // 거울 모드에선 텍스트가 뒤집혀 보이므로 한 번 더 뒤집기
-    octx.save();
-    if (currentFacing === 'user') {
-      // 캔버스 전체가 scaleX(-1) → 텍스트 위치도 거울 좌표계
-      // 박스 좌측 상단에 라벨을 두고 싶으면 실제로는 우측에서 그려야 함
-      octx.translate(cw, 0);
-      octx.scale(-1, 1);
-      const fx = cw - x - textW; // 거울 반전 좌표
-      const fy = y - textH;
-      octx.fillStyle = color;
-      octx.fillRect(fx, fy, textW, textH);
-      octx.fillStyle = '#000';
-      octx.textBaseline = 'middle';
-      octx.textAlign = 'left';
-      octx.fillText(text, fx + 6, fy + textH / 2);
+  function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  async function runCalibration() {
+    calOverlay.classList.add('on');
+    calSamples = [];
+    for (let i = 0; i < CAL_POINTS.length; i++) {
+      if (!running) return;
+      const pt = CAL_POINTS[i];
+      calDot.style.left = pt.xPct + '%';
+      calDot.style.top = pt.yPct + '%';
+      calText.textContent = `"${pt.name}" 점을 응시하세요`;
+      calCounter.textContent = `${i+1} / ${CAL_POINTS.length}`;
+      calDot.classList.remove('collecting');
+      await sleep(800);
+      if (!running) return;
+      calDot.classList.add('collecting');
+      calCurrent = { sx: 0, sy: 0, n: 0 };
+      calCollecting = true;
+      await sleep(1500);
+      calCollecting = false;
+      const avgX = calCurrent.sx / Math.max(1, calCurrent.n);
+      const avgY = calCurrent.sy / Math.max(1, calCurrent.n);
+      calSamples.push({ rawX: avgX, rawY: avgY, screenX: pt.xPct/100, screenY: pt.yPct/100 });
+    }
+    const xr = polyReg2(calSamples.map(s => s.rawX), calSamples.map(s => s.screenX));
+    const yr = polyReg2(calSamples.map(s => s.rawY), calSamples.map(s => s.screenY));
+    calOverlay.classList.remove('on');
+    if (xr && yr) {
+      calibration = { done: true, axx: xr.a, ax: xr.b, bx: xr.c, ayy: yr.a, ay: yr.b, by: yr.c };
+      statusEl.textContent = '추적 중';
+      statusEl.className = 'status-text ok';
+      recalBtn.disabled = false;
+      log('시선 캘리브레이션 완료');
     } else {
-      const labelY = y < textH ? y + h : y - textH;
-      octx.fillStyle = color;
-      octx.fillRect(x, labelY, textW, textH);
-      octx.fillStyle = '#000';
-      octx.textBaseline = 'middle';
-      octx.textAlign = 'left';
-      octx.fillText(text, x + 6, labelY + textH / 2);
-    }
-    octx.restore();
-  }
-  return validDetections;
-}
-
-function updateLabelsPanel(detections) {
-  if (detections.length === 0) {
-    labelsEl.classList.add('empty');
-    return;
-  }
-  labelsEl.classList.remove('empty');
-  labelsEl.innerHTML = '';
-
-  const best = {};
-  for (const d of detections) {
-    const c = d.categories[0];
-    if (!best[c.categoryName] || best[c.categoryName] < c.score) {
-      best[c.categoryName] = c.score;
+      statusEl.textContent = '캘리브레이션 실패';
+      statusEl.className = 'status-text err';
+      recalBtn.disabled = false;
     }
   }
 
-  const sorted = Object.entries(best).sort((a, b) => b[1] - a[1]);
-  for (const [name, score] of sorted) {
-    const row = document.createElement('div');
-    row.className = 'label-row';
-    row.innerHTML = `
-      <div class="label-dot" style="background:${colorFor(name)}"></div>
-      <div class="label-name">${koLabel(name)}</div>
-      <div class="label-conf">${(score * 100).toFixed(0)}%</div>
-    `;
-    labelsEl.appendChild(row);
-  }
-}
-
-function updateFps(now) {
-  frameTimes.push(now);
-  while (frameTimes.length > 30 && now - frameTimes[0] > 1000) {
-    frameTimes.shift();
-  }
-  if (frameTimes.length >= 2) {
-    const span = (frameTimes[frameTimes.length - 1] - frameTimes[0]) / 1000;
-    const fps = (frameTimes.length - 1) / span;
-    fpsEl.textContent = `${fps.toFixed(1)} fps`;
-  }
-}
-
-function loop() {
-  if (!running) return;
-  const now = performance.now();
-  if (video.currentTime !== lastVideoTime) {
-    lastVideoTime = video.currentTime;
-    try {
-      const result = objectDetector.detectForVideo(video, now);
-      const detections = result.detections || [];
-      const valid = drawDetections(
-        detections,
-        video.videoWidth, video.videoHeight,
-        overlay.width, overlay.height
-      );
-      updateLabelsPanel(valid);
-      updateFps(now);
-    } catch (e) {
-      log(`detect 오류: ${e.message}`, 'err');
+  function loop() {
+    if (!running) return;
+    const now = performance.now();
+    const delta = (now - lastTickTime) / 1000;
+    lastTickTime = now;
+    if (video.currentTime !== lastVideoTime) {
+      lastVideoTime = video.currentTime;
+      try {
+        const result = face.detectForVideo(video, now);
+        if (result.faceLandmarks && result.faceLandmarks.length > 0) {
+          const lm = result.faceLandmarks[0];
+          const matrix = result.facialTransformationMatrixes
+            ? result.facialTransformationMatrixes[0] : null;
+          const { rawX, rawY } = getRawGaze(lm, matrix);
+          if (calCollecting) {
+            calCurrent.sx += rawX; calCurrent.sy += rawY; calCurrent.n++;
+          }
+          if (calibration.done) {
+            const s = rawToScreen(rawX, rawY);
+            const sx = smooth(smoothBuf.x, s.x);
+            const sy = smooth(smoothBuf.y, s.y);
+            if (showGaze) {
+              gazeDot.style.left = (sx * window.innerWidth) + 'px';
+              gazeDot.style.top = (sy * window.innerHeight) + 'px';
+            }
+            const q = (sy < 0.5 ? 'T' : 'B') + (sx < 0.5 ? 'L' : 'R');
+            if (q !== currentQuad) {
+              currentQuad = q;
+              for (const k of Object.keys(quads)) quads[k].classList.toggle('active', k === q);
+            }
+            gazeTimes[q] += delta;
+            quads[q].querySelector('.gaze-time').textContent = gazeTimes[q].toFixed(1) + 's';
+          }
+          // 홍채만 그리기
+          octx.clearRect(0, 0, overlay.width, overlay.height);
+          octx.fillStyle = '#4ade80';
+          for (const idx of [468, 473]) {
+            const p = lm[idx];
+            octx.beginPath();
+            octx.arc(p.x * overlay.width, p.y * overlay.height, 4, 0, Math.PI * 2);
+            octx.fill();
+          }
+        }
+      } catch (e) { log(`face detect: ${e.message}`, 'err'); }
     }
+    requestAnimationFrame(loop);
+  }
+
+  // 핸들러
+  const recalHandler = async () => {
+    recalBtn.disabled = true;
+    calibration.done = false;
+    statusEl.textContent = '재캘리브레이션 중...';
+    statusEl.className = 'status-text';
+    await runCalibration();
+  };
+  const dotHandler = () => {
+    showGaze = !showGaze;
+    gazeDot.classList.toggle('on', showGaze);
+    dotBtn.textContent = showGaze ? '시선점 ✓' : '시선점';
+  };
+  const resetHandler = () => {
+    gazeTimes = { TL: 0, TR: 0, BL: 0, BR: 0 };
+    for (const k of Object.keys(quads)) {
+      quads[k].querySelector('.gaze-time').textContent = '0.0s';
+    }
+  };
+  recalBtn.addEventListener('click', recalHandler);
+  dotBtn.addEventListener('click', dotHandler);
+  resetBtn.addEventListener('click', resetHandler);
+
+  requestAnimationFrame(loop);
+  setTimeout(runCalibration, 500);
+
+  return () => {
+    running = false;
+    previewEl.classList.remove('on');
+    gazeDot.classList.remove('on');
+    showGaze = false;
+    calOverlay.classList.remove('on');
+    recalBtn.removeEventListener('click', recalHandler);
+    dotBtn.removeEventListener('click', dotHandler);
+    resetBtn.removeEventListener('click', resetHandler);
+    for (const k of Object.keys(quads)) {
+      quads[k].classList.remove('active');
+      quads[k].querySelector('.gaze-time').textContent = '0.0s';
+    }
+  };
+}
+
+// =================================================================
+// 손 공용: 분석 함수들
+// =================================================================
+
+function getFingerStates(lm) {
+  const index = lm[8].y < lm[6].y;
+  const middle = lm[12].y < lm[10].y;
+  const ring = lm[16].y < lm[14].y;
+  const pinky = lm[20].y < lm[18].y;
+  const thumb = Math.abs(lm[4].x - lm[2].x) > Math.abs(lm[3].x - lm[2].x);
+  return { thumb, index, middle, ring, pinky };
+}
+
+function classifyGesture(lm) {
+  const f = getFingerStates(lm);
+  const count = [f.thumb, f.index, f.middle, f.ring, f.pinky].filter(Boolean).length;
+  if (count === 0) return { name: '주먹', emoji: '✊', conf: 0.9 };
+  if (f.index && !f.middle && !f.ring && !f.pinky && !f.thumb) {
+    return { name: '검지', emoji: '☝️', conf: 0.9 };
+  }
+  if (f.index && f.middle && !f.ring && !f.pinky) {
+    return { name: '가위(V)', emoji: '✌️', conf: 0.9 };
+  }
+  if (f.thumb && !f.index && !f.middle && !f.ring && !f.pinky) {
+    return { name: '엄지척', emoji: '👍', conf: 0.85 };
+  }
+  const pd = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y);
+  if (pd < 0.06 && f.middle && f.ring && f.pinky) {
+    return { name: 'OK', emoji: '👌', conf: 0.85 };
+  }
+  if (count >= 4) return { name: '보', emoji: '🖐️', conf: 0.9 };
+  return { name: '?', emoji: '🤔', conf: 0.3 };
+}
+
+function isPinching(lm) {
+  return Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y) < 0.05;
+}
+
+function drawHandOverlay(octx, lm, w, h) {
+  octx.clearRect(0, 0, w, h);
+  if (!lm) return;
+  const conns = [
+    [0,1],[1,2],[2,3],[3,4],
+    [0,5],[5,6],[6,7],[7,8],
+    [5,9],[9,10],[10,11],[11,12],
+    [9,13],[13,14],[14,15],[15,16],
+    [13,17],[17,18],[18,19],[19,20],
+    [0,17],
+  ];
+  octx.strokeStyle = '#4ade80';
+  octx.lineWidth = 2;
+  for (const [a,b] of conns) {
+    octx.beginPath();
+    octx.moveTo(lm[a].x * w, lm[a].y * h);
+    octx.lineTo(lm[b].x * w, lm[b].y * h);
+    octx.stroke();
+  }
+  octx.fillStyle = '#fff';
+  for (const p of lm) {
+    octx.beginPath();
+    octx.arc(p.x * w, p.y * h, 3, 0, Math.PI * 2);
+    octx.fill();
+  }
+}
+
+// =================================================================
+// 모드 2: 손 포인터
+// =================================================================
+
+async function startPointerMode() {
+  const statusEl = document.getElementById('pointer-status');
+  const previewEl = document.getElementById('pointer-preview');
+  const video = previewEl.querySelector('video');
+  const overlay = previewEl.querySelector('canvas');
+  const octx = overlay.getContext('2d');
+  const cursor = document.getElementById('finger-cursor');
+  const stage = document.querySelector('#pointer-mode .stage-area');
+
+  const quads = {
+    TL: document.querySelector('#pointer-mode [data-q="TL"]'),
+    TR: document.querySelector('#pointer-mode [data-q="TR"]'),
+    BL: document.querySelector('#pointer-mode [data-q="BL"]'),
+    BR: document.querySelector('#pointer-mode [data-q="BR"]'),
+  };
+
+  let running = true;
+  let lastVideoTime = -1;
+  let currentQuad = null;
+  const smoothBuf = { x: [], y: [], size: 4 };
+  function smooth(buf, val) {
+    buf.push(val);
+    if (buf.length > smoothBuf.size) buf.shift();
+    return buf.reduce((a,b) => a+b, 0) / buf.length;
+  }
+
+  showLoading('카메라 시작...', '');
+  const stream = await openCamera('user');
+  await attachStream(video, stream);
+  overlay.width = video.videoWidth;
+  overlay.height = video.videoHeight;
+  previewEl.classList.add('on');
+
+  const hand = await getHandLandmarker();
+  hideLoading();
+  statusEl.textContent = '손을 카메라에 보여주세요';
+  statusEl.className = 'status-text ok';
+
+  function loop() {
+    if (!running) return;
+    if (video.currentTime !== lastVideoTime) {
+      lastVideoTime = video.currentTime;
+      try {
+        const result = hand.detectForVideo(video, performance.now());
+        if (result.landmarks && result.landmarks.length > 0) {
+          const lm = result.landmarks[0];
+          drawHandOverlay(octx, lm, overlay.width, overlay.height);
+          const tip = lm[8];
+          const x = (1 - tip.x) * stage.clientWidth;
+          const y = tip.y * stage.clientHeight;
+          const sx = smooth(smoothBuf.x, x);
+          const sy = smooth(smoothBuf.y, y);
+          cursor.classList.add('on');
+          cursor.style.left = sx + 'px';
+          cursor.style.top = sy + 'px';
+          cursor.classList.toggle('pinch', isPinching(lm));
+          const rect = stage.getBoundingClientRect();
+          const q = (sy/rect.height < 0.5 ? 'T' : 'B') + (sx/rect.width < 0.5 ? 'L' : 'R');
+          if (q !== currentQuad) {
+            currentQuad = q;
+            for (const k of Object.keys(quads)) quads[k].classList.toggle('active', k === q);
+          }
+        } else {
+          octx.clearRect(0, 0, overlay.width, overlay.height);
+          cursor.classList.remove('on', 'pinch');
+          for (const k of Object.keys(quads)) quads[k].classList.remove('active');
+          currentQuad = null;
+        }
+      } catch (e) { log(`hand detect: ${e.message}`, 'err'); }
+    }
+    requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
+
+  return () => {
+    running = false;
+    previewEl.classList.remove('on');
+    cursor.classList.remove('on', 'pinch');
+    for (const k of Object.keys(quads)) quads[k].classList.remove('active');
+  };
 }
 
-camSwitch.addEventListener('click', async () => {
-  if (!running) return;
-  currentFacing = currentFacing === 'environment' ? 'user' : 'environment';
-  log(`카메라 전환: ${currentFacing}`);
-  statusEl.textContent = '카메라 전환 중...';
-  try {
-    await openCamera(currentFacing);
-    statusEl.textContent = '감지 중';
-  } catch (e) {
-    log(`전환 실패: ${e.message}`, 'err');
-    statusEl.textContent = '전환 실패';
+// =================================================================
+// 모드 3: 제스처
+// =================================================================
+
+async function startGestureMode() {
+  const statusEl = document.getElementById('gesture-status');
+  const previewEl = document.getElementById('gesture-preview');
+  const video = previewEl.querySelector('video');
+  const overlay = previewEl.querySelector('canvas');
+  const octx = overlay.getContext('2d');
+  const emoji = document.getElementById('gesture-emoji');
+  const nameEl = document.getElementById('gesture-name');
+  const confEl = document.getElementById('gesture-confidence');
+  const historyEl = document.getElementById('gesture-history');
+  const clearBtn = document.getElementById('gesture-clear');
+
+  let running = true;
+  let lastVideoTime = -1;
+  let lastGesture = null;
+  let stableFrames = 0;
+  let history = [];
+
+  function renderHistory() {
+    historyEl.innerHTML = '';
+    for (const h of history) {
+      const d = document.createElement('div');
+      d.className = 'hist-item';
+      d.textContent = h.emoji;
+      historyEl.appendChild(d);
+    }
   }
-});
 
-threshSlider.addEventListener('input', () => {
-  threshold = parseInt(threshSlider.value) / 100;
-  threshVal.textContent = threshSlider.value + '%';
-});
+  showLoading('카메라 시작...', '');
+  const stream = await openCamera('user');
+  await attachStream(video, stream);
+  overlay.width = video.videoWidth;
+  overlay.height = video.videoHeight;
+  previewEl.classList.add('on');
 
-startBtn.addEventListener('click', startApp);
-toggleLogBtn.addEventListener('click', () => logEl.classList.toggle('show'));
+  const hand = await getHandLandmarker();
+  hideLoading();
+  statusEl.textContent = '손 모양을 만들어보세요';
+  statusEl.className = 'status-text ok';
 
-log('초기화 완료. 시작 버튼을 눌러주세요.');
+  function loop() {
+    if (!running) return;
+    if (video.currentTime !== lastVideoTime) {
+      lastVideoTime = video.currentTime;
+      try {
+        const result = hand.detectForVideo(video, performance.now());
+        if (result.landmarks && result.landmarks.length > 0) {
+          const lm = result.landmarks[0];
+          drawHandOverlay(octx, lm, overlay.width, overlay.height);
+          const g = classifyGesture(lm);
+          if (lastGesture && lastGesture.name === g.name) stableFrames++;
+          else stableFrames = 0;
+          lastGesture = g;
+          if (stableFrames >= 3) {
+            emoji.textContent = g.emoji;
+            emoji.classList.add('active');
+            nameEl.textContent = g.name;
+            nameEl.classList.remove('none');
+            confEl.textContent = `신뢰도 ${(g.conf * 100).toFixed(0)}%`;
+            if (history.length === 0 || history[history.length-1].name !== g.name) {
+              history.push(g);
+              if (history.length > 5) history.shift();
+              renderHistory();
+            }
+          }
+        } else {
+          octx.clearRect(0, 0, overlay.width, overlay.height);
+          emoji.classList.remove('active');
+          nameEl.textContent = '손을 보여주세요';
+          nameEl.classList.add('none');
+          confEl.textContent = '대기 중';
+          stableFrames = 0;
+        }
+      } catch (e) { log(`hand detect: ${e.message}`, 'err'); }
+    }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  const clearHandler = () => { history = []; renderHistory(); };
+  clearBtn.addEventListener('click', clearHandler);
+
+  return () => {
+    running = false;
+    previewEl.classList.remove('on');
+    emoji.classList.remove('active');
+    nameEl.textContent = '손을 보여주세요';
+    nameEl.classList.add('none');
+    confEl.textContent = '대기 중';
+    history = [];
+    renderHistory();
+    clearBtn.removeEventListener('click', clearHandler);
+  };
+}
+
+// =================================================================
+// 모드 4: 드로잉
+// =================================================================
+
+async function startDrawingMode() {
+  const statusEl = document.getElementById('drawing-status');
+  const previewEl = document.getElementById('drawing-preview');
+  const video = previewEl.querySelector('video');
+  const overlay = previewEl.querySelector('canvas');
+  const octx = overlay.getContext('2d');
+  const canvas = document.getElementById('draw-canvas');
+  const dctx = canvas.getContext('2d');
+  const clearBtn = document.getElementById('draw-clear');
+  const colorBtns = document.querySelectorAll('.color-btn');
+
+  let running = true;
+  let lastVideoTime = -1;
+  let lastPoint = null;
+  let color = '#4ade80';
+  const smoothBuf = { x: [], y: [], size: 3 };
+  function smooth(buf, val) {
+    buf.push(val);
+    if (buf.length > smoothBuf.size) buf.shift();
+    return buf.reduce((a,b) => a+b, 0) / buf.length;
+  }
+
+  function resize() {
+    const r = canvas.getBoundingClientRect();
+    const imgData = canvas.width > 0 ? dctx.getImageData(0, 0, canvas.width, canvas.height) : null;
+    canvas.width = r.width;
+    canvas.height = r.height;
+    if (imgData) try { dctx.putImageData(imgData, 0, 0); } catch(e){}
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  showLoading('카메라 시작...', '');
+  const stream = await openCamera('user');
+  await attachStream(video, stream);
+  overlay.width = video.videoWidth;
+  overlay.height = video.videoHeight;
+  previewEl.classList.add('on');
+
+  const hand = await getHandLandmarker();
+  hideLoading();
+  statusEl.textContent = '검지로 그리세요';
+  statusEl.className = 'status-text ok';
+
+  function loop() {
+    if (!running) return;
+    if (video.currentTime !== lastVideoTime) {
+      lastVideoTime = video.currentTime;
+      try {
+        const result = hand.detectForVideo(video, performance.now());
+        if (result.landmarks && result.landmarks.length > 0) {
+          const lm = result.landmarks[0];
+          drawHandOverlay(octx, lm, overlay.width, overlay.height);
+          const f = getFingerStates(lm);
+          const onlyIndex = f.index && !f.middle && !f.ring && !f.pinky;
+          const allOpen = f.index && f.middle && f.ring && f.pinky;
+          const fist = !f.index && !f.middle && !f.ring && !f.pinky;
+          if (allOpen) {
+            dctx.clearRect(0, 0, canvas.width, canvas.height);
+            lastPoint = null;
+          } else if (fist) {
+            lastPoint = null;
+          } else if (onlyIndex) {
+            const tip = lm[8];
+            const x = (1 - tip.x) * canvas.width;
+            const y = tip.y * canvas.height;
+            const sx = smooth(smoothBuf.x, x);
+            const sy = smooth(smoothBuf.y, y);
+            if (lastPoint) {
+              dctx.strokeStyle = color;
+              dctx.lineWidth = 4;
+              dctx.lineCap = 'round';
+              dctx.lineJoin = 'round';
+              dctx.beginPath();
+              dctx.moveTo(lastPoint.x, lastPoint.y);
+              dctx.lineTo(sx, sy);
+              dctx.stroke();
+            }
+            lastPoint = { x: sx, y: sy };
+          } else {
+            lastPoint = null;
+          }
+        } else {
+          octx.clearRect(0, 0, overlay.width, overlay.height);
+          lastPoint = null;
+        }
+      } catch (e) { log(`hand detect: ${e.message}`, 'err'); }
+    }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  const clearHandler = () => dctx.clearRect(0, 0, canvas.width, canvas.height);
+  clearBtn.addEventListener('click', clearHandler);
+  const colorHandlers = [];
+  colorBtns.forEach(btn => {
+    const h = () => {
+      colorBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      color = btn.dataset.color;
+    };
+    btn.addEventListener('click', h);
+    colorHandlers.push({ btn, h });
+  });
+
+  return () => {
+    running = false;
+    window.removeEventListener('resize', resize);
+    previewEl.classList.remove('on');
+    clearBtn.removeEventListener('click', clearHandler);
+    colorHandlers.forEach(({btn,h}) => btn.removeEventListener('click', h));
+  };
+}
+
+// =================================================================
+// 모드 5: 객체 감지
+// =================================================================
+
+const KO_LABELS = {
+  'person':'사람','bicycle':'자전거','car':'자동차','motorcycle':'오토바이',
+  'airplane':'비행기','bus':'버스','train':'기차','truck':'트럭','boat':'보트',
+  'traffic light':'신호등','fire hydrant':'소화전','stop sign':'정지 표지',
+  'parking meter':'주차요금기','bench':'벤치',
+  'bird':'새','cat':'고양이','dog':'강아지','horse':'말','sheep':'양','cow':'소',
+  'elephant':'코끼리','bear':'곰','zebra':'얼룩말','giraffe':'기린',
+  'backpack':'가방','umbrella':'우산','handbag':'핸드백','tie':'넥타이','suitcase':'여행가방',
+  'frisbee':'프리스비','skis':'스키','snowboard':'스노보드','sports ball':'공',
+  'kite':'연','baseball bat':'야구방망이','baseball glove':'야구글러브',
+  'skateboard':'스케이트보드','surfboard':'서핑보드','tennis racket':'테니스라켓',
+  'bottle':'병','wine glass':'와인잔','cup':'컵','fork':'포크','knife':'칼',
+  'spoon':'숟가락','bowl':'그릇','banana':'바나나','apple':'사과','sandwich':'샌드위치',
+  'orange':'오렌지','broccoli':'브로콜리','carrot':'당근','hot dog':'핫도그',
+  'pizza':'피자','donut':'도넛','cake':'케이크',
+  'chair':'의자','couch':'소파','potted plant':'화분','bed':'침대','dining table':'식탁',
+  'toilet':'변기','tv':'TV','laptop':'노트북','mouse':'마우스','remote':'리모컨',
+  'keyboard':'키보드','cell phone':'휴대폰','microwave':'전자레인지','oven':'오븐',
+  'toaster':'토스터','sink':'싱크대','refrigerator':'냉장고',
+  'book':'책','clock':'시계','vase':'꽃병','scissors':'가위','teddy bear':'곰인형',
+  'hair drier':'드라이어','toothbrush':'칫솔',
+};
+const COLOR_MAP = {
+  bird:'#4ade80',cat:'#4ade80',dog:'#4ade80',horse:'#4ade80',sheep:'#4ade80',
+  cow:'#4ade80',elephant:'#4ade80',bear:'#4ade80',zebra:'#4ade80',giraffe:'#4ade80',
+  person:'#fbbf24',
+  bicycle:'#3b82f6',car:'#3b82f6',motorcycle:'#3b82f6',airplane:'#3b82f6',
+  bus:'#3b82f6',train:'#3b82f6',truck:'#3b82f6',boat:'#3b82f6',
+};
+function objColor(n) { return COLOR_MAP[n] || '#ef4444'; }
+function objKo(n) { return KO_LABELS[n] || n; }
+
+async function startObjectMode() {
+  const statusEl = document.getElementById('object-status');
+  const video = document.getElementById('obj-video');
+  const overlay = document.getElementById('obj-overlay');
+  const octx = overlay.getContext('2d');
+  const labelsEl = document.getElementById('obj-labels');
+  const fpsEl = document.getElementById('fps');
+  const camSwitch = document.getElementById('cam-switch');
+  const threshSlider = document.getElementById('thresh');
+  const threshVal = document.getElementById('thresh-val');
+  const toggleLogBtn = document.getElementById('toggle-log');
+
+  let running = true;
+  let lastVideoTime = -1;
+  let currentFacing = 'environment';
+  let threshold = 0.5;
+  let frameTimes = [];
+
+  async function open(facing) {
+    const s = await openCamera(facing);
+    await attachStream(video, s);
+    if (facing === 'user') {
+      video.style.transform = 'scaleX(-1)';
+      overlay.style.transform = 'scaleX(-1)';
+    } else {
+      video.style.transform = 'none';
+      overlay.style.transform = 'none';
+    }
+    resize();
+  }
+  function resize() {
+    const r = video.getBoundingClientRect();
+    overlay.width = r.width;
+    overlay.height = r.height;
+  }
+  window.addEventListener('resize', resize);
+
+  showLoading('카메라 시작...', '');
+  await open('environment');
+  const detector = await getObjectDetector();
+  hideLoading();
+  statusEl.textContent = '감지 중';
+  statusEl.className = 'status-text ok';
+
+  function fit(vw, vh, cw, ch) {
+    const va = vw/vh, ca = cw/ch;
+    let dw, dh, ox, oy;
+    if (va > ca) { dh = ch; dw = ch * va; ox = (cw-dw)/2; oy = 0; }
+    else { dw = cw; dh = cw / va; ox = 0; oy = (ch-dh)/2; }
+    return { sx: dw/vw, sy: dh/vh, ox, oy };
+  }
+
+  function draw(detections, vw, vh, cw, ch) {
+    octx.clearRect(0, 0, cw, ch);
+    const f = fit(vw, vh, cw, ch);
+    const valid = [];
+    for (const d of detections) {
+      const c = d.categories[0];
+      if (!c || c.score < threshold) continue;
+      valid.push(d);
+      const b = d.boundingBox;
+      const x = b.originX * f.sx + f.ox;
+      const y = b.originY * f.sy + f.oy;
+      const w = b.width * f.sx;
+      const h = b.height * f.sy;
+      const col = objColor(c.categoryName);
+      const ko = objKo(c.categoryName);
+      const conf = (c.score * 100).toFixed(0);
+      octx.strokeStyle = col;
+      octx.lineWidth = 3;
+      octx.strokeRect(x, y, w, h);
+      const text = `${ko} ${conf}%`;
+      octx.font = 'bold 14px -apple-system, sans-serif';
+      const tw = octx.measureText(text).width + 12;
+      const th = 22;
+      octx.save();
+      if (currentFacing === 'user') {
+        octx.translate(cw, 0);
+        octx.scale(-1, 1);
+        const fx = cw - x - tw, fy = y - th;
+        octx.fillStyle = col;
+        octx.fillRect(fx, fy, tw, th);
+        octx.fillStyle = '#000';
+        octx.textBaseline = 'middle';
+        octx.textAlign = 'left';
+        octx.fillText(text, fx + 6, fy + th/2);
+      } else {
+        const ly = y < th ? y + h : y - th;
+        octx.fillStyle = col;
+        octx.fillRect(x, ly, tw, th);
+        octx.fillStyle = '#000';
+        octx.textBaseline = 'middle';
+        octx.textAlign = 'left';
+        octx.fillText(text, x + 6, ly + th/2);
+      }
+      octx.restore();
+    }
+    return valid;
+  }
+
+  function updateLabels(detections) {
+    if (detections.length === 0) {
+      labelsEl.classList.add('empty');
+      return;
+    }
+    labelsEl.classList.remove('empty');
+    labelsEl.innerHTML = '';
+    const best = {};
+    for (const d of detections) {
+      const c = d.categories[0];
+      if (!best[c.categoryName] || best[c.categoryName] < c.score) best[c.categoryName] = c.score;
+    }
+    Object.entries(best).sort((a,b) => b[1] - a[1]).forEach(([n,s]) => {
+      const row = document.createElement('div');
+      row.className = 'label-row';
+      row.innerHTML = `
+        <div class="label-dot" style="background:${objColor(n)}"></div>
+        <div class="label-name">${objKo(n)}</div>
+        <div class="label-conf">${(s*100).toFixed(0)}%</div>
+      `;
+      labelsEl.appendChild(row);
+    });
+  }
+
+  function updateFps(now) {
+    frameTimes.push(now);
+    while (frameTimes.length > 30 && now - frameTimes[0] > 1000) frameTimes.shift();
+    if (frameTimes.length >= 2) {
+      const span = (frameTimes[frameTimes.length-1] - frameTimes[0]) / 1000;
+      fpsEl.textContent = `${((frameTimes.length-1) / span).toFixed(1)} fps`;
+    }
+  }
+
+  function loop() {
+    if (!running) return;
+    const now = performance.now();
+    if (video.currentTime !== lastVideoTime) {
+      lastVideoTime = video.currentTime;
+      try {
+        const result = detector.detectForVideo(video, now);
+        const valid = draw(
+          result.detections || [],
+          video.videoWidth, video.videoHeight,
+          overlay.width, overlay.height
+        );
+        updateLabels(valid);
+        updateFps(now);
+      } catch (e) { log(`object detect: ${e.message}`, 'err'); }
+    }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  const switchHandler = async () => {
+    currentFacing = currentFacing === 'environment' ? 'user' : 'environment';
+    statusEl.textContent = '카메라 전환...';
+    try { await open(currentFacing); statusEl.textContent = '감지 중'; }
+    catch (e) { log(`전환 실패: ${e.message}`, 'err'); }
+  };
+  const threshHandler = () => {
+    threshold = parseInt(threshSlider.value) / 100;
+    threshVal.textContent = threshSlider.value + '%';
+  };
+  const logHandler = () => logEl.classList.toggle('show');
+  camSwitch.addEventListener('click', switchHandler);
+  threshSlider.addEventListener('input', threshHandler);
+  toggleLogBtn.addEventListener('click', logHandler);
+
+  return () => {
+    running = false;
+    window.removeEventListener('resize', resize);
+    camSwitch.removeEventListener('click', switchHandler);
+    threshSlider.removeEventListener('input', threshHandler);
+    toggleLogBtn.removeEventListener('click', logHandler);
+    labelsEl.classList.add('empty');
+  };
+}
+
+log('통합 데모 준비 완료');
 </script>
 
 </body>
