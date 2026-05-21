@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>객체 감지</title>
+<title>객체 감지 (강아지 포함 80종)</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
@@ -13,7 +13,6 @@
   }
   #app { position: fixed; inset: 0; display: flex; flex-direction: column; }
 
-  /* 카메라 풀스크린 */
   #stage {
     flex: 1;
     position: relative;
@@ -23,62 +22,78 @@
   #video {
     position: absolute;
     inset: 0;
-    width: 100%;
-    height: 100%;
+    width: 100%; height: 100%;
     object-fit: cover;
-    transform: scaleX(-1); /* 거울 모드 */
   }
   #overlay {
     position: absolute;
     inset: 0;
-    width: 100%;
-    height: 100%;
+    width: 100%; height: 100%;
     pointer-events: none;
-    transform: scaleX(-1); /* 박스도 같이 반전 */
   }
 
-  /* 상단 통계 */
-  #stats {
+  #labels {
     position: absolute;
     top: 12px; left: 12px;
     background: rgba(0,0,0,0.7);
-    backdrop-filter: blur(10px);
-    padding: 10px 14px;
-    border-radius: 10px;
-    font-size: 13px;
+    padding: 10px 12px;
+    border-radius: 8px;
     z-index: 10;
-    line-height: 1.5;
+    font-size: 13px;
+    line-height: 1.6;
+    max-width: 60%;
+    max-height: 40%;
+    overflow-y: auto;
+    backdrop-filter: blur(10px);
   }
-  #stats .count { font-weight: 700; color: #4ade80; font-size: 18px; }
-  #stats .fps { color: #888; font-size: 11px; }
+  #labels.empty { display: none; }
+  .label-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .label-row:last-child { margin-bottom: 0; }
+  .label-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .label-name { flex: 1; color: #fff; font-weight: 500; }
+  .label-conf {
+    color: #888;
+    font-variant-numeric: tabular-nums;
+    font-size: 12px;
+  }
 
-  /* 발견된 객체 리스트 */
-  #found-list {
+  #cam-switch {
     position: absolute;
     top: 12px; right: 12px;
-    max-width: 50%;
+    background: rgba(0,0,0,0.7);
+    padding: 8px 12px;
+    border-radius: 8px;
     z-index: 10;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    align-items: flex-end;
-  }
-  .found-tag {
-    background: rgba(74, 222, 128, 0.9);
-    color: #000;
-    padding: 4px 10px;
-    border-radius: 6px;
     font-size: 12px;
-    font-weight: 600;
-    backdrop-filter: blur(8px);
-    animation: pop 0.2s ease-out;
-  }
-  @keyframes pop {
-    from { transform: scale(0.8); opacity: 0; }
-    to { transform: scale(1); opacity: 1; }
+    color: #fff;
+    cursor: pointer;
+    border: 1px solid #2a2a2a;
+    backdrop-filter: blur(10px);
   }
 
-  /* 패널 */
+  #fps {
+    position: absolute;
+    bottom: 12px; left: 12px;
+    background: rgba(0,0,0,0.7);
+    padding: 6px 10px;
+    border-radius: 6px;
+    z-index: 10;
+    font-size: 11px;
+    color: #4ade80;
+    font-family: 'SF Mono', Menlo, monospace;
+    font-variant-numeric: tabular-nums;
+    backdrop-filter: blur(10px);
+  }
+
   #panel {
     background: #0a0a0a;
     border-top: 1px solid #2a2a2a;
@@ -88,7 +103,9 @@
     align-items: center;
     flex-shrink: 0;
   }
-  #status { flex: 1; font-size: 12px; color: #888; line-height: 1.4; }
+  #status {
+    flex: 1; font-size: 12px; color: #888; line-height: 1.4;
+  }
   #status.ok { color: #4ade80; }
   #status.err { color: #ef4444; }
   button {
@@ -100,50 +117,6 @@
   button:disabled { background: #374151; opacity: 0.6; }
   button.secondary { background: #374151; }
 
-  /* 필터 패널 */
-  #filter-panel {
-    position: absolute;
-    bottom: 12px; left: 12px; right: 12px;
-    background: rgba(0,0,0,0.85);
-    backdrop-filter: blur(10px);
-    border-radius: 10px;
-    padding: 12px;
-    z-index: 15;
-    display: none;
-    max-height: 300px;
-    overflow-y: auto;
-  }
-  #filter-panel.on { display: block; }
-  #filter-panel h3 {
-    font-size: 13px; color: #888; margin-bottom: 8px;
-    display: flex; justify-content: space-between; align-items: center;
-  }
-  .filter-actions {
-    display: flex; gap: 6px;
-  }
-  .filter-actions button { padding: 4px 8px; font-size: 11px; }
-  .filter-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 4px;
-  }
-  .filter-item {
-    padding: 6px 8px;
-    background: #1a1a1a;
-    border-radius: 6px;
-    font-size: 11px;
-    color: #888;
-    cursor: pointer;
-    text-align: center;
-    border: 1px solid transparent;
-  }
-  .filter-item.on {
-    background: #1e3a8a;
-    color: #fff;
-    border-color: #2563eb;
-  }
-
-  /* 인트로 */
   #intro {
     position: fixed; inset: 0;
     background: rgba(10,10,10,0.98);
@@ -154,14 +127,50 @@
   }
   .intro-card { max-width: 360px; text-align: center; }
   .intro-card h1 { font-size: 22px; margin-bottom: 16px; }
-  .intro-card p { color: #aaa; font-size: 14px; line-height: 1.6; margin-bottom: 20px; }
+  .intro-card p {
+    color: #aaa; font-size: 14px;
+    line-height: 1.6; margin-bottom: 20px;
+  }
   .intro-card ul {
     text-align: left; color: #888; font-size: 13px;
     line-height: 1.8; margin-bottom: 20px; padding-left: 20px;
   }
   .intro-card button { width: 100%; padding: 14px; font-size: 15px; }
+  .cat-list {
+    background: #1a1a1a;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 11px;
+    color: #888;
+    margin-bottom: 20px;
+    line-height: 1.5;
+    text-align: left;
+  }
 
-  /* 로그 */
+  #thresh-bar {
+    position: absolute;
+    bottom: 12px; right: 12px;
+    background: rgba(0,0,0,0.7);
+    padding: 8px 12px;
+    border-radius: 8px;
+    z-index: 10;
+    font-size: 11px;
+    color: #ccc;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    backdrop-filter: blur(10px);
+  }
+  #thresh-bar input {
+    width: 80px;
+    accent-color: #2563eb;
+  }
+  #thresh-val {
+    color: #4ade80;
+    font-variant-numeric: tabular-nums;
+    min-width: 28px;
+  }
+
   #log {
     position: fixed;
     left: 12px; right: 12px; bottom: 70px;
@@ -187,43 +196,37 @@
   <div id="stage">
     <video id="video" autoplay playsinline muted></video>
     <canvas id="overlay"></canvas>
-
-    <div id="stats">
-      <div><span class="count" id="count">0</span> 개 감지</div>
-      <div class="fps" id="fps">-- fps</div>
-    </div>
-
-    <div id="found-list"></div>
-
-    <div id="filter-panel">
-      <h3>
-        <span>카테고리 필터</span>
-        <div class="filter-actions">
-          <button id="filter-all" class="secondary">전체</button>
-          <button id="filter-animals" class="secondary">동물만</button>
-          <button id="filter-none" class="secondary">해제</button>
-        </div>
-      </h3>
-      <div class="filter-grid" id="filter-grid"></div>
+    <div id="labels" class="empty"></div>
+    <div id="cam-switch">📷 전환</div>
+    <div id="fps">-- fps</div>
+    <div id="thresh-bar">
+      신뢰도 ≥ <span id="thresh-val">50%</span>
+      <input type="range" id="thresh" min="20" max="90" value="50">
     </div>
   </div>
 
   <div id="panel">
     <div id="status">대기 중</div>
-    <button id="toggle-filter" class="secondary">필터</button>
     <button id="toggle-log" class="secondary">로그</button>
   </div>
 </div>
 
 <div id="intro">
   <div class="intro-card">
-    <h1>📷 객체 감지</h1>
-    <p>카메라에 잡힌 객체를 실시간으로 인식합니다.<br>강아지 포함 80가지를 알아봐요.</p>
+    <h1>🔍 객체 감지</h1>
+    <p>카메라에 잡히는 물체를 실시간으로<br>박스로 표시하고 이름을 알려줍니다.</p>
+    <div class="cat-list">
+      <strong style="color:#fff">인식 가능 (80종):</strong><br>
+      🐕 동물 — 강아지, 고양이, 새, 말, 양, 소, 코끼리, 곰, 얼룩말, 기린<br>
+      🚗 탈것 — 자전거, 차, 오토바이, 비행기, 버스, 기차, 보트<br>
+      🍔 음식 — 사과, 바나나, 샌드위치, 피자, 케이크 등<br>
+      🪑 사물 — 의자, 소파, TV, 노트북, 휴대폰, 책 등<br>
+      ⚽ 기타 — 사람, 가방, 우산, 공, 그릇 등
+    </div>
     <ul>
-      <li><strong>동물</strong>: 강아지, 고양이, 새, 말, 양, 소 등</li>
-      <li><strong>사물</strong>: 컵, 휴대폰, 의자, 책 등</li>
-      <li>여러 개 동시 인식 가능</li>
-      <li>박스가 객체를 따라다님</li>
+      <li>전/후면 카메라 전환 (강아지는 후면 권장)</li>
+      <li>여러 객체 동시 인식</li>
+      <li>박스가 움직임 따라 추적</li>
     </ul>
     <button id="start-btn">카메라 시작</button>
   </div>
@@ -232,7 +235,6 @@
 <div id="log"></div>
 
 <script>
-// ========== 로깅 ==========
 const logEl = document.getElementById('log');
 function log(msg, type = 'info') {
   const line = document.createElement('div');
@@ -252,137 +254,78 @@ window.addEventListener('unhandledrejection', (e) => {
   logEl.classList.add('show');
 });
 
-// ========== 한글 라벨 매핑 (COCO 80) ==========
+// 한국어 라벨
 const KO_LABELS = {
-  'person': '사람', 'bicycle': '자전거', 'car': '자동차', 'motorcycle': '오토바이',
-  'airplane': '비행기', 'bus': '버스', 'train': '기차', 'truck': '트럭', 'boat': '보트',
-  'traffic light': '신호등', 'fire hydrant': '소화전', 'stop sign': '정지표지', 'parking meter': '주차미터', 'bench': '벤치',
-  'bird': '새', 'cat': '고양이', 'dog': '강아지', 'horse': '말', 'sheep': '양',
-  'cow': '소', 'elephant': '코끼리', 'bear': '곰', 'zebra': '얼룩말', 'giraffe': '기린',
-  'backpack': '배낭', 'umbrella': '우산', 'handbag': '핸드백', 'tie': '넥타이', 'suitcase': '여행가방',
-  'frisbee': '프리스비', 'skis': '스키', 'snowboard': '스노보드', 'sports ball': '공',
-  'kite': '연', 'baseball bat': '야구방망이', 'baseball glove': '야구글러브', 'skateboard': '스케이트보드',
+  'person': '사람', 'bicycle': '자전거', 'car': '자동차',
+  'motorcycle': '오토바이', 'airplane': '비행기', 'bus': '버스',
+  'train': '기차', 'truck': '트럭', 'boat': '보트',
+  'traffic light': '신호등', 'fire hydrant': '소화전', 'stop sign': '정지 표지',
+  'parking meter': '주차요금기', 'bench': '벤치',
+  'bird': '새', 'cat': '고양이', 'dog': '강아지', 'horse': '말',
+  'sheep': '양', 'cow': '소', 'elephant': '코끼리', 'bear': '곰',
+  'zebra': '얼룩말', 'giraffe': '기린',
+  'backpack': '가방', 'umbrella': '우산', 'handbag': '핸드백',
+  'tie': '넥타이', 'suitcase': '여행가방',
+  'frisbee': '프리스비', 'skis': '스키', 'snowboard': '스노보드',
+  'sports ball': '공', 'kite': '연', 'baseball bat': '야구방망이',
+  'baseball glove': '야구글러브', 'skateboard': '스케이트보드',
   'surfboard': '서핑보드', 'tennis racket': '테니스라켓',
-  'bottle': '병', 'wine glass': '와인잔', 'cup': '컵', 'fork': '포크', 'knife': '나이프',
-  'spoon': '숟가락', 'bowl': '그릇',
-  'banana': '바나나', 'apple': '사과', 'sandwich': '샌드위치', 'orange': '오렌지',
-  'broccoli': '브로콜리', 'carrot': '당근', 'hot dog': '핫도그', 'pizza': '피자',
-  'donut': '도넛', 'cake': '케이크',
-  'chair': '의자', 'couch': '소파', 'potted plant': '화분', 'bed': '침대', 'dining table': '식탁',
-  'toilet': '변기', 'tv': 'TV', 'laptop': '노트북', 'mouse': '마우스', 'remote': '리모컨',
-  'keyboard': '키보드', 'cell phone': '휴대폰', 'microwave': '전자레인지', 'oven': '오븐',
-  'toaster': '토스터', 'sink': '싱크대', 'refrigerator': '냉장고',
-  'book': '책', 'clock': '시계', 'vase': '꽃병', 'scissors': '가위', 'teddy bear': '인형',
+  'bottle': '병', 'wine glass': '와인잔', 'cup': '컵',
+  'fork': '포크', 'knife': '칼', 'spoon': '숟가락', 'bowl': '그릇',
+  'banana': '바나나', 'apple': '사과', 'sandwich': '샌드위치',
+  'orange': '오렌지', 'broccoli': '브로콜리', 'carrot': '당근',
+  'hot dog': '핫도그', 'pizza': '피자', 'donut': '도넛', 'cake': '케이크',
+  'chair': '의자', 'couch': '소파', 'potted plant': '화분',
+  'bed': '침대', 'dining table': '식탁', 'toilet': '변기',
+  'tv': 'TV', 'laptop': '노트북', 'mouse': '마우스',
+  'remote': '리모컨', 'keyboard': '키보드', 'cell phone': '휴대폰',
+  'microwave': '전자레인지', 'oven': '오븐', 'toaster': '토스터',
+  'sink': '싱크대', 'refrigerator': '냉장고',
+  'book': '책', 'clock': '시계', 'vase': '꽃병',
+  'scissors': '가위', 'teddy bear': '곰인형',
   'hair drier': '드라이어', 'toothbrush': '칫솔',
 };
 
-const ANIMAL_CATEGORIES = ['bird', 'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe', 'person'];
-
-function getKoLabel(en) {
+const CATEGORY_COLORS = {
+  'bird': '#4ade80', 'cat': '#4ade80', 'dog': '#4ade80',
+  'horse': '#4ade80', 'sheep': '#4ade80', 'cow': '#4ade80',
+  'elephant': '#4ade80', 'bear': '#4ade80',
+  'zebra': '#4ade80', 'giraffe': '#4ade80',
+  'person': '#fbbf24',
+  'bicycle': '#3b82f6', 'car': '#3b82f6', 'motorcycle': '#3b82f6',
+  'airplane': '#3b82f6', 'bus': '#3b82f6', 'train': '#3b82f6',
+  'truck': '#3b82f6', 'boat': '#3b82f6',
+};
+function colorFor(name) {
+  return CATEGORY_COLORS[name] || '#ef4444';
+}
+function koLabel(en) {
   return KO_LABELS[en] || en;
 }
 
-// 카테고리별 색상
-function colorForCategory(name) {
-  const animals = new Set(ANIMAL_CATEGORIES);
-  if (animals.has(name)) return '#4ade80'; // 동물: 초록
-  if (name === 'person') return '#3b82f6';  // 사람: 파랑
-  // 나머지 사물: 해시 기반 색상
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
-  const hue = Math.abs(hash) % 360;
-  return `hsl(${hue}, 70%, 60%)`;
-}
-
-// ========== DOM ==========
 const startBtn = document.getElementById('start-btn');
-const toggleFilterBtn = document.getElementById('toggle-filter');
 const toggleLogBtn = document.getElementById('toggle-log');
+const camSwitch = document.getElementById('cam-switch');
 const statusEl = document.getElementById('status');
 const intro = document.getElementById('intro');
 const video = document.getElementById('video');
 const overlay = document.getElementById('overlay');
 const octx = overlay.getContext('2d');
-const stage = document.getElementById('stage');
-const countEl = document.getElementById('count');
+const labelsEl = document.getElementById('labels');
 const fpsEl = document.getElementById('fps');
-const foundList = document.getElementById('found-list');
-const filterPanel = document.getElementById('filter-panel');
-const filterGrid = document.getElementById('filter-grid');
+const threshSlider = document.getElementById('thresh');
+const threshVal = document.getElementById('thresh-val');
 
-// ========== 상태 ==========
 let objectDetector = null;
 let running = false;
 let lastVideoTime = -1;
+let currentFacing = 'environment';
+let currentStream = null;
+let threshold = 0.5;
+let frameTimes = [];
 
-// 필터: 빈 Set이면 전체 표시
-let enabledCategories = new Set();
-let filterMode = 'all'; // 'all' | 'animals' | 'custom'
-
-// FPS 측정
-let frameCount = 0;
-let lastFpsTime = performance.now();
-
-// "발견된 적 있는" 카테고리 추적 (튜토리얼 효과)
-let seenCategories = new Set();
-let recentFoundDisplay = new Map(); // name -> 마지막 표시 시각
-
-// ========== 필터 UI ==========
-function buildFilterUI() {
-  const allLabels = Object.keys(KO_LABELS).sort((a, b) => getKoLabel(a).localeCompare(getKoLabel(b)));
-  filterGrid.innerHTML = '';
-  for (const en of allLabels) {
-    const div = document.createElement('div');
-    div.className = 'filter-item';
-    div.textContent = getKoLabel(en);
-    div.dataset.cat = en;
-    div.addEventListener('click', () => toggleFilterItem(en, div));
-    filterGrid.appendChild(div);
-  }
-  applyFilterUI();
-}
-
-function toggleFilterItem(cat, el) {
-  if (enabledCategories.has(cat)) {
-    enabledCategories.delete(cat);
-  } else {
-    enabledCategories.add(cat);
-  }
-  filterMode = 'custom';
-  applyFilterUI();
-}
-
-function applyFilterUI() {
-  document.querySelectorAll('.filter-item').forEach(el => {
-    const isOn = enabledCategories.size === 0 || enabledCategories.has(el.dataset.cat);
-    el.classList.toggle('on', isOn);
-  });
-}
-
-document.getElementById('filter-all').addEventListener('click', () => {
-  enabledCategories.clear();
-  filterMode = 'all';
-  applyFilterUI();
-});
-document.getElementById('filter-animals').addEventListener('click', () => {
-  enabledCategories = new Set(ANIMAL_CATEGORIES);
-  filterMode = 'animals';
-  applyFilterUI();
-});
-document.getElementById('filter-none').addEventListener('click', () => {
-  enabledCategories = new Set(['__none__']); // 아무것도 매칭 안 됨
-  filterMode = 'custom';
-  applyFilterUI();
-});
-
-function isCategoryEnabled(cat) {
-  if (enabledCategories.size === 0) return true;
-  return enabledCategories.has(cat);
-}
-
-// ========== MediaPipe 로딩 ==========
-async function loadMediaPipe() {
-  log('MediaPipe 모듈 로딩...');
+async function loadObjectDetector() {
+  log('MediaPipe 로딩...');
   const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/vision_bundle.mjs');
   const { FilesetResolver, ObjectDetector } = vision;
 
@@ -391,7 +334,7 @@ async function loadMediaPipe() {
     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/wasm"
   );
 
-  log('Object Detector 모델 다운로드... (~10MB)');
+  log('Object Detector 모델 다운로드...');
   let detector;
   try {
     detector = await ObjectDetector.createFromOptions(filesetResolver, {
@@ -399,9 +342,9 @@ async function loadMediaPipe() {
         modelAssetPath: "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite",
         delegate: "GPU"
       },
-      scoreThreshold: 0.4,
-      runningMode: "VIDEO",
+      scoreThreshold: 0.3,
       maxResults: 10,
+      runningMode: "VIDEO"
     });
     log('GPU 모드');
   } catch (e) {
@@ -411,210 +354,220 @@ async function loadMediaPipe() {
         modelAssetPath: "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite",
         delegate: "CPU"
       },
-      scoreThreshold: 0.4,
-      runningMode: "VIDEO",
+      scoreThreshold: 0.3,
       maxResults: 10,
+      runningMode: "VIDEO"
     });
     log('CPU 모드');
   }
   return detector;
 }
 
-// ========== 시작 ==========
+async function openCamera(facing) {
+  if (currentStream) {
+    currentStream.getTracks().forEach(t => t.stop());
+  }
+  log(`카메라 요청: ${facing}`);
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: {
+      facingMode: facing,
+      width: { ideal: 640 },
+      height: { ideal: 480 }
+    },
+    audio: false
+  });
+  currentStream = stream;
+  video.srcObject = stream;
+  await new Promise((res, rej) => {
+    video.addEventListener('loadeddata', res, { once: true });
+    setTimeout(() => rej(new Error('비디오 타임아웃')), 10000);
+  });
+
+  // 전면 카메라일 땐 거울 모드
+  if (facing === 'user') {
+    video.style.transform = 'scaleX(-1)';
+    overlay.style.transform = 'scaleX(-1)';
+  } else {
+    video.style.transform = 'none';
+    overlay.style.transform = 'none';
+  }
+
+  resizeOverlay();
+  log(`비디오: ${video.videoWidth}x${video.videoHeight}`);
+}
+
+function resizeOverlay() {
+  const rect = video.getBoundingClientRect();
+  overlay.width = rect.width;
+  overlay.height = rect.height;
+}
+window.addEventListener('resize', resizeOverlay);
+
 async function startApp() {
   startBtn.disabled = true;
   startBtn.textContent = '준비 중...';
 
   try {
-    log('카메라 권한 요청');
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
-      audio: false
-    });
-    video.srcObject = stream;
-    await new Promise((res, rej) => {
-      video.addEventListener('loadeddata', res, { once: true });
-      setTimeout(() => rej(new Error('비디오 타임아웃')), 10000);
-    });
-    log(`비디오: ${video.videoWidth}x${video.videoHeight}`);
-
-    // 후면 카메라가 안 되면 전면으로 재시도 (PC는 후면 없음)
-    // 위에서 environment로 시도했는데 실패한 경우는 catch에서 처리됨
-
-    resizeOverlay();
-    window.addEventListener('resize', resizeOverlay);
-
+    await openCamera(currentFacing);
     if (!objectDetector) {
-      objectDetector = await loadMediaPipe();
+      objectDetector = await loadObjectDetector();
     }
-
     intro.style.display = 'none';
-    buildFilterUI();
     running = true;
-    statusEl.textContent = '추적 중';
+    statusEl.textContent = '감지 중';
     statusEl.className = 'ok';
     requestAnimationFrame(loop);
   } catch (e) {
-    log(`environment 카메라 실패: ${e.message}, user로 재시도`, 'warn');
-    // 후면 실패 → 전면 시도
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: false
-      });
-      video.srcObject = stream;
-      await new Promise(res => video.addEventListener('loadeddata', res, { once: true }));
-      log(`비디오 (전면): ${video.videoWidth}x${video.videoHeight}`);
-      resizeOverlay();
-      window.addEventListener('resize', resizeOverlay);
-      if (!objectDetector) objectDetector = await loadMediaPipe();
-      intro.style.display = 'none';
-      buildFilterUI();
-      running = true;
-      statusEl.textContent = '추적 중 (전면 카메라)';
-      statusEl.className = 'ok';
-      requestAnimationFrame(loop);
-    } catch (e2) {
-      log(`시작 완전 실패: ${e2.message}`, 'err');
-      statusEl.textContent = '실패: ' + e2.message;
-      statusEl.className = 'err';
-      startBtn.disabled = false;
-      startBtn.textContent = '다시 시도';
-      logEl.classList.add('show');
-    }
+    log(`시작 실패: ${e.message}`, 'err');
+    statusEl.textContent = '실패: ' + e.message;
+    statusEl.className = 'err';
+    startBtn.disabled = false;
+    startBtn.textContent = '다시 시도';
+    logEl.classList.add('show');
   }
 }
 
-function resizeOverlay() {
-  const rect = stage.getBoundingClientRect();
-  overlay.width = rect.width;
-  overlay.height = rect.height;
-}
+// object-fit: cover 를 고려한 비디오 → 캔버스 좌표 변환
+// 비디오의 일부가 잘린 채 화면을 꽉 채우므로 그 잘림을 계산해야 함
+function computeVideoFit(vw, vh, cw, ch) {
+  const videoAspect = vw / vh;
+  const canvasAspect = cw / ch;
 
-// ========== 박스 그리기 ==========
-function drawDetections(detections) {
-  octx.clearRect(0, 0, overlay.width, overlay.height);
-  if (!detections || detections.length === 0) return;
-
-  // 비디오의 실제 표시 영역 계산 (object-fit: cover 보정)
-  const videoAspect = video.videoWidth / video.videoHeight;
-  const stageAspect = overlay.width / overlay.height;
-  let scale, offsetX = 0, offsetY = 0;
-  if (videoAspect > stageAspect) {
-    // 비디오가 더 와이드 → 좌우 잘림
-    scale = overlay.height / video.videoHeight;
-    offsetX = (overlay.width - video.videoWidth * scale) / 2;
+  let drawW, drawH, offsetX, offsetY;
+  if (videoAspect > canvasAspect) {
+    // 비디오가 더 넓음 → 높이 기준으로 채우고 좌우가 잘림
+    drawH = ch;
+    drawW = ch * videoAspect;
+    offsetX = (cw - drawW) / 2;
+    offsetY = 0;
   } else {
-    scale = overlay.width / video.videoWidth;
-    offsetY = (overlay.height - video.videoHeight * scale) / 2;
+    // 비디오가 더 좁음 → 너비 기준으로 채우고 상하가 잘림
+    drawW = cw;
+    drawH = cw / videoAspect;
+    offsetX = 0;
+    offsetY = (ch - drawH) / 2;
   }
+  const sx = drawW / vw;
+  const sy = drawH / vh;
+  return { sx, sy, offsetX, offsetY };
+}
 
-  let visibleCount = 0;
+function drawDetections(detections, vw, vh, cw, ch) {
+  octx.clearRect(0, 0, cw, ch);
+  const fit = computeVideoFit(vw, vh, cw, ch);
 
-  for (const det of detections) {
-    const cat = det.categories[0];
-    const name = cat.categoryName;
-    const score = cat.score;
+  const validDetections = [];
+  for (const d of detections) {
+    const cat = d.categories[0];
+    if (!cat || cat.score < threshold) continue;
+    validDetections.push(d);
 
-    if (!isCategoryEnabled(name)) continue;
-    visibleCount++;
+    const bbox = d.boundingBox;
+    const x = bbox.originX * fit.sx + fit.offsetX;
+    const y = bbox.originY * fit.sy + fit.offsetY;
+    const w = bbox.width * fit.sx;
+    const h = bbox.height * fit.sy;
 
-    // 발견 기록
-    if (!seenCategories.has(name)) {
-      seenCategories.add(name);
-      log(`새 객체 발견: ${getKoLabel(name)} (${name})`);
-    }
-    recentFoundDisplay.set(name, performance.now());
+    const color = colorFor(cat.categoryName);
+    const ko = koLabel(cat.categoryName);
+    const conf = (cat.score * 100).toFixed(0);
 
-    // 박스 좌표 (비디오 픽셀 → 캔버스 픽셀)
-    const bb = det.boundingBox;
-    const x = bb.originX * scale + offsetX;
-    const y = bb.originY * scale + offsetY;
-    const w = bb.width * scale;
-    const h = bb.height * scale;
-
-    const color = colorForCategory(name);
-
-    // 박스
+    // 박스 (안쪽으로 살짝 그라데이션 효과)
     octx.strokeStyle = color;
     octx.lineWidth = 3;
     octx.strokeRect(x, y, w, h);
 
-    // 라벨 (라벨은 거울 반전 안 되게 — 캔버스가 scaleX(-1)이라 텍스트도 뒤집힘)
-    // 해결: 라벨 텍스트만 다시 한 번 뒤집어서 정상으로 보이게
-    octx.save();
-    octx.translate(x + w, y);  // 박스 오른쪽 위로 이동 (반전 기준점)
-    octx.scale(-1, 1);          // 다시 뒤집기
-    const label = `${getKoLabel(name)} ${(score * 100).toFixed(0)}%`;
+    // 라벨
+    const text = `${ko} ${conf}%`;
     octx.font = 'bold 14px -apple-system, sans-serif';
-    const textW = octx.measureText(label).width;
-    // 배경
-    octx.fillStyle = color;
-    octx.fillRect(0, -22, textW + 12, 22);
-    // 텍스트
-    octx.fillStyle = '#000';
-    octx.fillText(label, 6, -6);
+    const textW = octx.measureText(text).width + 12;
+    const textH = 22;
+
+    // 거울 모드에선 텍스트가 뒤집혀 보이므로 한 번 더 뒤집기
+    octx.save();
+    if (currentFacing === 'user') {
+      // 캔버스 전체가 scaleX(-1) → 텍스트 위치도 거울 좌표계
+      // 박스 좌측 상단에 라벨을 두고 싶으면 실제로는 우측에서 그려야 함
+      octx.translate(cw, 0);
+      octx.scale(-1, 1);
+      const fx = cw - x - textW; // 거울 반전 좌표
+      const fy = y - textH;
+      octx.fillStyle = color;
+      octx.fillRect(fx, fy, textW, textH);
+      octx.fillStyle = '#000';
+      octx.textBaseline = 'middle';
+      octx.textAlign = 'left';
+      octx.fillText(text, fx + 6, fy + textH / 2);
+    } else {
+      const labelY = y < textH ? y + h : y - textH;
+      octx.fillStyle = color;
+      octx.fillRect(x, labelY, textW, textH);
+      octx.fillStyle = '#000';
+      octx.textBaseline = 'middle';
+      octx.textAlign = 'left';
+      octx.fillText(text, x + 6, labelY + textH / 2);
+    }
     octx.restore();
   }
-
-  countEl.textContent = visibleCount;
-  updateFoundList();
+  return validDetections;
 }
 
-// 최근에 발견된 객체 태그를 우측 상단에 표시
-function updateFoundList() {
-  const now = performance.now();
-  const RECENT_MS = 1500;
-
-  // 1.5초 이상 안 보인 건 제거
-  for (const [name, t] of recentFoundDisplay.entries()) {
-    if (now - t > RECENT_MS) recentFoundDisplay.delete(name);
+function updateLabelsPanel(detections) {
+  if (detections.length === 0) {
+    labelsEl.classList.add('empty');
+    return;
   }
+  labelsEl.classList.remove('empty');
+  labelsEl.innerHTML = '';
 
-  // 현재 활성 태그 다시 렌더
-  const existing = new Map();
-  foundList.querySelectorAll('.found-tag').forEach(el => {
-    existing.set(el.dataset.cat, el);
-  });
-
-  // 추가/유지
-  for (const name of recentFoundDisplay.keys()) {
-    if (!existing.has(name)) {
-      const tag = document.createElement('div');
-      tag.className = 'found-tag';
-      tag.dataset.cat = name;
-      tag.textContent = getKoLabel(name);
-      tag.style.background = colorForCategory(name) + 'e6';
-      foundList.appendChild(tag);
-    } else {
-      existing.delete(name);
+  const best = {};
+  for (const d of detections) {
+    const c = d.categories[0];
+    if (!best[c.categoryName] || best[c.categoryName] < c.score) {
+      best[c.categoryName] = c.score;
     }
   }
-  // 제거
-  for (const el of existing.values()) {
-    el.remove();
+
+  const sorted = Object.entries(best).sort((a, b) => b[1] - a[1]);
+  for (const [name, score] of sorted) {
+    const row = document.createElement('div');
+    row.className = 'label-row';
+    row.innerHTML = `
+      <div class="label-dot" style="background:${colorFor(name)}"></div>
+      <div class="label-name">${koLabel(name)}</div>
+      <div class="label-conf">${(score * 100).toFixed(0)}%</div>
+    `;
+    labelsEl.appendChild(row);
   }
 }
 
-// ========== 메인 루프 ==========
+function updateFps(now) {
+  frameTimes.push(now);
+  while (frameTimes.length > 30 && now - frameTimes[0] > 1000) {
+    frameTimes.shift();
+  }
+  if (frameTimes.length >= 2) {
+    const span = (frameTimes[frameTimes.length - 1] - frameTimes[0]) / 1000;
+    const fps = (frameTimes.length - 1) / span;
+    fpsEl.textContent = `${fps.toFixed(1)} fps`;
+  }
+}
+
 function loop() {
   if (!running) return;
-
+  const now = performance.now();
   if (video.currentTime !== lastVideoTime) {
     lastVideoTime = video.currentTime;
     try {
-      const result = objectDetector.detectForVideo(video, performance.now());
-      drawDetections(result.detections);
-
-      // FPS
-      frameCount++;
-      const now = performance.now();
-      if (now - lastFpsTime > 1000) {
-        const fps = (frameCount * 1000 / (now - lastFpsTime)).toFixed(0);
-        fpsEl.textContent = `${fps} fps`;
-        frameCount = 0;
-        lastFpsTime = now;
-      }
+      const result = objectDetector.detectForVideo(video, now);
+      const detections = result.detections || [];
+      const valid = drawDetections(
+        detections,
+        video.videoWidth, video.videoHeight,
+        overlay.width, overlay.height
+      );
+      updateLabelsPanel(valid);
+      updateFps(now);
     } catch (e) {
       log(`detect 오류: ${e.message}`, 'err');
     }
@@ -622,9 +575,26 @@ function loop() {
   requestAnimationFrame(loop);
 }
 
-// ========== UI ==========
+camSwitch.addEventListener('click', async () => {
+  if (!running) return;
+  currentFacing = currentFacing === 'environment' ? 'user' : 'environment';
+  log(`카메라 전환: ${currentFacing}`);
+  statusEl.textContent = '카메라 전환 중...';
+  try {
+    await openCamera(currentFacing);
+    statusEl.textContent = '감지 중';
+  } catch (e) {
+    log(`전환 실패: ${e.message}`, 'err');
+    statusEl.textContent = '전환 실패';
+  }
+});
+
+threshSlider.addEventListener('input', () => {
+  threshold = parseInt(threshSlider.value) / 100;
+  threshVal.textContent = threshSlider.value + '%';
+});
+
 startBtn.addEventListener('click', startApp);
-toggleFilterBtn.addEventListener('click', () => filterPanel.classList.toggle('on'));
 toggleLogBtn.addEventListener('click', () => logEl.classList.toggle('show'));
 
 log('초기화 완료. 시작 버튼을 눌러주세요.');
